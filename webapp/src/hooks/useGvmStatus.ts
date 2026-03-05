@@ -19,6 +19,8 @@ interface UseGvmStatusReturn {
   refetch: () => Promise<void>
   startGvm: () => Promise<GvmState | null>
   stopGvm: () => Promise<GvmState | null>
+  pauseGvm: () => Promise<GvmState | null>
+  resumeGvm: () => Promise<GvmState | null>
 }
 
 const DEFAULT_POLLING_INTERVAL = 5000
@@ -117,6 +119,7 @@ export function useGvmStatus({
     if (!projectId) return null
 
     setIsLoading(true)
+    setState(prev => prev ? { ...prev, status: 'stopping' as GvmState['status'] } : prev)
 
     try {
       const response = await fetch(`/api/gvm/${projectId}/stop`, {
@@ -126,6 +129,64 @@ export function useGvmStatus({
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to stop GVM scan')
+      }
+
+      const data: GvmState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const pauseGvm = useCallback(async (): Promise<GvmState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/gvm/${projectId}/pause`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to pause GVM scan')
+      }
+
+      const data: GvmState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const resumeGvm = useCallback(async (): Promise<GvmState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/gvm/${projectId}/resume`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to resume GVM scan')
       }
 
       const data: GvmState = await response.json()
@@ -161,7 +222,7 @@ export function useGvmStatus({
       pollingRef.current = null
     }
 
-    const isRunning = state?.status === 'running' || state?.status === 'starting'
+    const isRunning = state?.status === 'running' || state?.status === 'starting' || state?.status === 'paused'
     const interval = isRunning ? pollingInterval : IDLE_POLLING_INTERVAL
 
     pollingRef.current = setInterval(fetchStatus, interval)
@@ -181,6 +242,8 @@ export function useGvmStatus({
     refetch: fetchStatus,
     startGvm,
     stopGvm,
+    pauseGvm,
+    resumeGvm,
   }
 }
 

@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.3.0] - 2026-03-05
+## [2.2.0] - 2026-03-05
 
 ### Added
 
+- **Pipeline Pause / Resume / Stop Controls** — full lifecycle management for all three pipelines (Recon, GVM Scan, GitHub Secret Hunt):
+  - **Pause** — freezes the running container via Docker cgroups (`container.pause()`). Zero changes to scan scripts; processes resume exactly where they left off
+  - **Resume** — unfreezes the container (`container.unpause()`), logs resume streaming instantly
+  - **Stop** — kills the container permanently. Paused containers are unpaused before stopping to avoid cgroup issues. Sub-containers (naabu, httpx, nuclei, etc.) are also cleaned up
+  - **Toolbar UI** — when running: spinner + Pause button + Stop button. When paused: Resume button + Stop button. When stopping: "Stopping..." with disabled controls
+  - **Logs drawer controls** — pause/resume and stop buttons in the status bar, with `Paused` status indicator and spinner during stopping
+  - **Optimistic UI** — stop button immediately shows "Stopping..." before the API responds
+  - **SSE stays alive** during pause and stopping states so logs resume/complete without reconnection
+  - 6 new backend endpoints (`POST /{recon,gvm,github-hunt}/{projectId}/{pause,resume}`) and 9 new webapp API proxy routes (pause/resume/stop × 3 pipelines)
+  - Removed the auto-scroll play/pause toggle from logs drawer (redundant with "Scroll to bottom" button)
 - **IP/CIDR Targeting Mode** — start reconnaissance from IP addresses or CIDR ranges instead of a domain:
   - **"Start from IP" toggle** in the Target & Modules tab — switches the project from domain-based to IP-based targeting. Locked after creation (cannot switch modes on existing projects)
   - **Target IPs / CIDRs textarea** — accepts individual IPs (`192.168.1.1`), IPv6 (`2001:db8::1`), and CIDR ranges (`10.0.0.0/24`, `192.168.1.0/28`) with a max /24 (256 hosts) limit per CIDR
@@ -21,20 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Tenant-scoped Neo4j constraints** — IP, Subdomain, BaseURL, Port, Service, and Technology uniqueness constraints are now scoped to `(key, user_id, project_id)`, allowing the same IP/subdomain to exist in different projects without conflicts
   - **Input validation** — new `webapp/src/lib/validation.ts` module with regex validators for IPs, CIDRs, domains, ports, status codes, HTTP headers, GitHub tokens, and more. Validation runs on form submit
   - `ipMode` and `targetIps` fields added to Prisma schema with database migration
-
-### Changed
-
-- **Conflict detection** — IP-mode projects skip domain conflict checks entirely (tenant-scoped Neo4j constraints make IP overlap safe across projects). Domain-mode conflict detection unchanged
-- **HTTP probe scope filtering** — `is_host_in_scope()` reordered to check `allowed_hosts` before `root_domain` scope, fixing IP-mode where the fake root domain caused all real hostnames to be filtered out. Added `input` URL fallback for redirect chains
-- **GAU disabled in IP mode** — passive URL archives index by domain, not IP; GAU is automatically skipped when `ip_mode` is active
-- **Domain ownership verification** skipped in IP mode — not applicable to IP-based targets
-
----
-
-## [2.2.1] - 2026-03-04
-
-### Added
-
 - **Chisel TCP Tunnel Integration** — multi-port reverse tunnel alternative to ngrok for full attack path support:
   - chisel (v1.11.4) installed alongside ngrok in kali-sandbox Dockerfile — single binary, supports amd64 and arm64
   - Reverse tunnels both port 4444 (handler) and port 8080 (web delivery/HTA) through a single connection to a VPS
@@ -45,19 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `CHISEL_SERVER_URL` and `CHISEL_AUTH` env vars added to `.env.example` and `docker-compose.yml`
   - `_query_chisel_tunnel()` utility in `agentic/utils.py` with `get_session_config_prompt()` integration
   - `agentChiselTunnelEnabled` Prisma field with database migration
-
-### Changed
-
-- **Tunnel Provider Dropdown** — replaced the single "Enable ngrok TCP Tunnel" toggle in Agent Behaviour settings with a **Tunnel Provider** dropdown (None / ngrok / chisel). Mutually exclusive — selecting one automatically disables the other
-- **Agent prompts updated** — phishing, CVE exploit, and post-exploitation prompts now conditionally guide the agent based on which tunnel provider is active (ngrok limitations vs chisel capabilities)
-- **Wiki and documentation** — updated AI Agent Guide, Project Settings Reference, Attack Paths guide, README, and README.ATTACK_PATHS.md with dual tunnel provider documentation
-
----
-
-## [2.2.0] - 2026-03-01
-
-### Added
-
 - **Phishing / Social Engineering Attack Path** (`phishing_social_engineering`) — third classified attack path with a mandatory 6-step workflow: target platform selection, handler setup, payload generation, verification, delivery, and session callback:
   - **Standalone Payloads** (Method A): msfvenom-based payload generation for Windows (exe, psh, psh-reflection, vba, hta-psh), Linux (elf, bash, python), macOS (macho), Android (apk), Java (war), and cross-platform (python) — with optional AV evasion via shikata_ga_nai encoding
   - **Malicious Documents** (Method B): Metasploit fileformat modules for weaponized Word macro (.docm), Excel macro (.xlsm), PDF (Adobe Reader exploit), RTF (CVE-2017-0199 HTA handler), and LNK shortcut files
@@ -76,10 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `is_session_config_complete()` short-circuits to complete when ngrok tunnel is active
   - `NGROK_AUTHTOKEN` added to `.env.example` and `docker-compose.yml` (kali-sandbox env + port 4040 exposed)
 - **Phishing Section in Project Settings** — new `PhishingSection` component with SMTP configuration textarea for per-project email delivery settings
-- **Tunnel Toggle in Agent Behaviour Settings** — "Enable ngrok TCP Tunnel" toggle that conditionally hides manual LHOST/LPORT/Bind Port fields when active (upgraded to Tunnel Provider dropdown in v2.2.1)
+- **Tunnel Provider Dropdown** — replaced the single "Enable ngrok TCP Tunnel" toggle in Agent Behaviour settings with a **Tunnel Provider** dropdown (None / ngrok / chisel). Mutually exclusive — selecting one automatically disables the other
 - **Social Engineering Suggestion Templates** — 15 new suggestion buttons in AI Assistant drawer under a pink "Social Engineering" template group (Mail icon), covering payload generation, malicious documents, web delivery, HTA, email phishing, AV evasion, and more
 - **Phishing Attack Path Badge** — pink "PHISH" badge with `#ec4899` accent color for phishing sessions in the AI Assistant drawer
-- **Prisma Migrations** — `20260228120000_add_ngrok_tunnel` (agentNgrokTunnelEnabled) and `20260228130000_add_phishing_smtp_config` (phishingSmtpConfig) database migrations
+- **Prisma Migrations** — `20260228120000_add_ngrok_tunnel` (agentNgrokTunnelEnabled), `20260228130000_add_phishing_smtp_config` (phishingSmtpConfig), and `20260305145750_add_ip_mode` (ipMode, targetIps) database migrations
 - **Remote Shells Tab** — new "Remote Shells" tab on the graph dashboard for real-time session management:
   - Unified view of all active Metasploit sessions (meterpreter, shell), background handlers/jobs, and non-MSF listeners (netcat, socat)
   - Sessions auto-detected from the Kali sandbox with 3-second polling and background cache refresh
@@ -100,11 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Conflict detection** — IP-mode projects skip domain conflict checks entirely (tenant-scoped Neo4j constraints make IP overlap safe across projects). Domain-mode conflict detection unchanged
+- **HTTP probe scope filtering** — `is_host_in_scope()` reordered to check `allowed_hosts` before `root_domain` scope, fixing IP-mode where the fake root domain caused all real hostnames to be filtered out. Added `input` URL fallback for redirect chains
+- **GAU disabled in IP mode** — passive URL archives index by domain, not IP; GAU is automatically skipped when `ip_mode` is active
+- **Domain ownership verification** skipped in IP mode — not applicable to IP-based targets
 - **Session Config Prompt** — refactored to inject pre-configured payload settings (LHOST/LPORT/ngrok) BEFORE the attack chain workflow, so all attack paths (not just CVE exploit) see payload direction — previously injected only after CVE fallback
+- **Agent prompts updated** — phishing, CVE exploit, and post-exploitation prompts now conditionally guide the agent based on which tunnel provider is active (ngrok limitations vs chisel capabilities)
 - **Recon: HTTP Probe DNS Fallback** — now probes common non-standard HTTP ports (8080, 8000, 8888, 3000, 5000, 9000) and HTTPS ports (8443, 4443, 9443) when falling back to DNS-only target building, improving coverage when naabu port scan results are empty
 - **Recon: Port Scanner SYN→CONNECT Retry** — when SYN scan completes but finds 0 open ports (firewall silently dropping SYN probes), automatically retries with CONNECT scan (full TCP handshake) which works through most firewalls
 - **Attack Paths Documentation** (`README.ATTACK_PATHS.md`) — comprehensive rewrite of Category 3 (Social Engineering / Phishing) with implementation details, 6-step workflow diagram, payload matrix, module reference, delivery methods, SMTP configuration guide, post-exploitation flow, and implementation file reference table
-- **README** — version bump to v2.2.0, ngrok authtoken added to env setup, exploitation phase docs updated with phishing path and ngrok tunnel descriptions, attack path table expanded to 4 rows, project settings summary updated
+- **Wiki and documentation** — updated AI Agent Guide, Project Settings Reference, Attack Paths guide, README, and README.ATTACK_PATHS.md with dual tunnel provider documentation
 
 ### Fixed
 

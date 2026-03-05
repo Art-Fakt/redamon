@@ -111,7 +111,28 @@
   border-color: var(--border-hover);
 }
 
+/* Pipeline control button variants */
+.iconButtonPaused {
+  color: var(--status-warning);
+  border-color: var(--status-warning);
+}
+
+.iconButtonPaused:hover {
+  background: var(--status-warning);
+  color: white;
+}
+
+.iconButtonStop:hover {
+  background: var(--status-error);
+  color: white;
+  border-color: var(--status-error);
+}
+
 /* Status indicators */
+.pausedIcon {
+  color: var(--status-warning);
+}
+
 .runningIndicator {
   width: 8px;
   height: 8px;
@@ -281,4 +302,13 @@
   background: var(--accent-primary);
   border-color: var(--accent-primary);
   color: var(--text-on-accent);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

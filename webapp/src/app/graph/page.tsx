@@ -109,6 +109,9 @@ export default function GraphPage() {
     state: reconState,
     isLoading: isReconLoading,
     startRecon,
+    stopRecon,
+    pauseRecon,
+    resumeRecon,
   } = useReconStatus({
     projectId,
     enabled: !!projectId,
@@ -134,14 +137,18 @@ export default function GraphPage() {
     clearLogs,
   } = useReconSSE({
     projectId,
-    enabled: reconState?.status === 'running' || reconState?.status === 'starting',
+    enabled: reconState?.status === 'running' || reconState?.status === 'starting' || reconState?.status === 'paused' || reconState?.status === 'stopping',
   })
 
   // GVM status hook
   const {
     state: gvmState,
     isLoading: isGvmLoading,
+    error: gvmError,
     startGvm,
+    stopGvm,
+    pauseGvm,
+    resumeGvm,
   } = useGvmStatus({
     projectId,
     enabled: !!projectId,
@@ -157,7 +164,7 @@ export default function GraphPage() {
     clearLogs: clearGvmLogs,
   } = useGvmSSE({
     projectId,
-    enabled: gvmState?.status === 'running' || gvmState?.status === 'starting',
+    enabled: gvmState?.status === 'running' || gvmState?.status === 'starting' || gvmState?.status === 'paused' || gvmState?.status === 'stopping',
   })
 
   // GitHub Hunt status hook
@@ -165,6 +172,9 @@ export default function GraphPage() {
     state: githubHuntState,
     isLoading: isGithubHuntLoading,
     startGithubHunt,
+    stopGithubHunt,
+    pauseGithubHunt,
+    resumeGithubHunt,
   } = useGithubHuntStatus({
     projectId,
     enabled: !!projectId,
@@ -180,7 +190,7 @@ export default function GraphPage() {
     clearLogs: clearGithubHuntLogs,
   } = useGithubHuntSSE({
     projectId,
-    enabled: githubHuntState?.status === 'running' || githubHuntState?.status === 'starting',
+    enabled: githubHuntState?.status === 'running' || githubHuntState?.status === 'starting' || githubHuntState?.status === 'paused' || githubHuntState?.status === 'stopping',
   })
 
   // Active sessions hook — polls kali-sandbox session list
@@ -584,6 +594,17 @@ export default function GraphPage() {
     setActiveLogsDrawer(prev => prev === 'githubHunt' ? null : 'githubHunt')
   }, [])
 
+  // Pause/Resume/Stop handlers
+  const handlePauseRecon = useCallback(async () => { await pauseRecon() }, [pauseRecon])
+  const handleResumeRecon = useCallback(async () => { await resumeRecon() }, [resumeRecon])
+  const handleStopRecon = useCallback(async () => { await stopRecon() }, [stopRecon])
+  const handlePauseGvm = useCallback(async () => { await pauseGvm() }, [pauseGvm])
+  const handleResumeGvm = useCallback(async () => { await resumeGvm() }, [resumeGvm])
+  const handleStopGvm = useCallback(async () => { await stopGvm() }, [stopGvm])
+  const handlePauseGithubHunt = useCallback(async () => { await pauseGithubHunt() }, [pauseGithubHunt])
+  const handleResumeGithubHunt = useCallback(async () => { await resumeGithubHunt() }, [resumeGithubHunt])
+  const handleStopGithubHunt = useCallback(async () => { await stopGithubHunt() }, [stopGithubHunt])
+
   // Show message if no project is selected
   if (!projectLoading && !projectId) {
     return (
@@ -614,6 +635,9 @@ export default function GraphPage() {
         subdomainList={currentProject?.subdomainList}
         // Recon props
         onStartRecon={handleStartRecon}
+        onPauseRecon={handlePauseRecon}
+        onResumeRecon={handleResumeRecon}
+        onStopRecon={handleStopRecon}
         onDownloadJSON={handleDownloadJSON}
         onToggleLogs={handleToggleLogs}
         reconStatus={reconState?.status || 'idle'}
@@ -621,6 +645,9 @@ export default function GraphPage() {
         isLogsOpen={activeLogsDrawer === 'recon'}
         // GVM props
         onStartGvm={handleStartGvm}
+        onPauseGvm={handlePauseGvm}
+        onResumeGvm={handleResumeGvm}
+        onStopGvm={handleStopGvm}
         onDownloadGvmJSON={handleDownloadGvmJSON}
         onToggleGvmLogs={handleToggleGvmLogs}
         gvmStatus={gvmState?.status || 'idle'}
@@ -628,6 +655,9 @@ export default function GraphPage() {
         isGvmLogsOpen={activeLogsDrawer === 'gvm'}
         // GitHub Hunt props
         onStartGithubHunt={handleStartGithubHunt}
+        onPauseGithubHunt={handlePauseGithubHunt}
+        onResumeGithubHunt={handleResumeGithubHunt}
+        onStopGithubHunt={handleStopGithubHunt}
         onDownloadGithubHuntJSON={handleDownloadGithubHuntJSON}
         onToggleGithubHuntLogs={handleToggleGithubHuntLogs}
         githubHuntStatus={githubHuntState?.status || 'idle'}
@@ -712,6 +742,9 @@ export default function GraphPage() {
         currentPhaseNumber={currentPhaseNumber}
         status={reconState?.status || 'idle'}
         onClearLogs={clearLogs}
+        onPause={handlePauseRecon}
+        onResume={handleResumeRecon}
+        onStop={handleStopRecon}
       />
 
       <ReconLogsDrawer
@@ -722,6 +755,9 @@ export default function GraphPage() {
         currentPhaseNumber={gvmCurrentPhaseNumber}
         status={gvmState?.status || 'idle'}
         onClearLogs={clearGvmLogs}
+        onPause={handlePauseGvm}
+        onResume={handleResumeGvm}
+        onStop={handleStopGvm}
         title="GVM Vulnerability Scan Logs"
         phases={GVM_PHASES}
         totalPhases={4}
@@ -735,6 +771,9 @@ export default function GraphPage() {
         currentPhaseNumber={githubHuntCurrentPhaseNumber}
         status={githubHuntState?.status || 'idle'}
         onClearLogs={clearGithubHuntLogs}
+        onPause={handlePauseGithubHunt}
+        onResume={handleResumeGithubHunt}
+        onStop={handleStopGithubHunt}
         title="GitHub Secret Hunt Logs"
         phases={GITHUB_HUNT_PHASES}
         totalPhases={3}
@@ -775,9 +814,10 @@ export default function GraphPage() {
         onClose={() => setIsGvmModalOpen(false)}
         onConfirm={handleConfirmGvm}
         projectName={currentProject?.name || 'Unknown'}
-        targetDomain={currentProject?.targetDomain || 'Unknown'}
+        targetDomain={currentProject?.targetDomain || currentProject?.targetIps?.join(', ') || 'Unknown'}
         stats={gvmStats}
         isLoading={isGvmLoading}
+        error={gvmError}
       />
 
       <PageBottomBar

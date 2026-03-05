@@ -17,6 +17,7 @@ interface GvmConfirmModalProps {
   targetDomain: string
   stats: GvmStats | null
   isLoading: boolean
+  error?: string | null
 }
 
 export function GvmConfirmModal({
@@ -27,6 +28,7 @@ export function GvmConfirmModal({
   targetDomain,
   stats,
   isLoading,
+  error,
 }: GvmConfirmModalProps) {
   const hasExistingData = stats && stats.totalGvmNodes > 0
 
@@ -87,6 +89,13 @@ export function GvmConfirmModal({
               This will scan <strong>{targetDomain}</strong> using GVM/OpenVAS and populate
               the graph with detected technologies, vulnerabilities, and CVEs.
             </p>
+          </div>
+        )}
+
+        {error && (
+          <div className={styles.errorBanner}>
+            <AlertTriangle size={14} />
+            <span>{error}</span>
           </div>
         )}
 

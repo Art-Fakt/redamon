@@ -266,6 +266,26 @@ async def stop_recon(project_id: str):
     return state
 
 
+@app.post("/recon/{project_id}/pause", response_model=ReconState)
+async def pause_recon(project_id: str):
+    """Pause a running recon process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.pause_recon(project_id)
+    return state
+
+
+@app.post("/recon/{project_id}/resume", response_model=ReconState)
+async def resume_recon(project_id: str):
+    """Resume a paused recon process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.resume_recon(project_id)
+    return state
+
+
 @app.get("/recon/{project_id}/logs")
 async def stream_logs(project_id: str):
     """
@@ -409,8 +429,13 @@ async def delete_project_files(project_id: str):
                 logger.error(f"Failed to delete project file {file_path}: {e}")
 
     # Clean up any running state for this project
-    if container_manager and project_id in container_manager.running_states:
-        del container_manager.running_states[project_id]
+    if container_manager:
+        if project_id in container_manager.running_states:
+            del container_manager.running_states[project_id]
+        if project_id in container_manager.gvm_states:
+            del container_manager.gvm_states[project_id]
+        if project_id in container_manager.github_hunt_states:
+            del container_manager.github_hunt_states[project_id]
 
     return {
         "success": len(errors) == 0,
@@ -517,6 +542,26 @@ async def stop_gvm_scan(project_id: str):
     return state
 
 
+@app.post("/gvm/{project_id}/pause", response_model=GvmState)
+async def pause_gvm_scan(project_id: str):
+    """Pause a running GVM scan process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.pause_gvm_scan(project_id)
+    return state
+
+
+@app.post("/gvm/{project_id}/resume", response_model=GvmState)
+async def resume_gvm_scan(project_id: str):
+    """Resume a paused GVM scan process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.resume_gvm_scan(project_id)
+    return state
+
+
 @app.get("/gvm/{project_id}/logs")
 async def stream_gvm_logs(project_id: str):
     """
@@ -618,6 +663,26 @@ async def stop_github_hunt(project_id: str):
         raise HTTPException(status_code=503, detail="Service not initialized")
 
     state = await container_manager.stop_github_hunt(project_id)
+    return state
+
+
+@app.post("/github-hunt/{project_id}/pause", response_model=GithubHuntState)
+async def pause_github_hunt(project_id: str):
+    """Pause a running GitHub Secret Hunt process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.pause_github_hunt(project_id)
+    return state
+
+
+@app.post("/github-hunt/{project_id}/resume", response_model=GithubHuntState)
+async def resume_github_hunt(project_id: str):
+    """Resume a paused GitHub Secret Hunt process"""
+    if not container_manager:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    state = await container_manager.resume_github_hunt(project_id)
     return state
 
 

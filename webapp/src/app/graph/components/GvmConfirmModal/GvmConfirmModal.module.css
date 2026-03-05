@@ -127,6 +127,18 @@
   color: var(--text-secondary) !important;
 }
 
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-default);
+  color: var(--status-error);
+  font-size: var(--text-sm);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

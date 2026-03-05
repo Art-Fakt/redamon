@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Terminal, CheckCircle, AlertCircle, Pause, Play, Trash2 } from 'lucide-react'
+import { X, Terminal, CheckCircle, AlertCircle, Pause, Play, Trash2, Square, Loader2 } from 'lucide-react'
 import { RECON_PHASES } from '@/lib/recon-types'
 import type { ReconLogEvent, ReconStatus } from '@/lib/recon-types'
 import styles from './ReconLogsDrawer.module.css'
@@ -14,6 +14,9 @@ interface ReconLogsDrawerProps {
   currentPhaseNumber: number | null
   status: ReconStatus
   onClearLogs: () => void
+  onPause?: () => void
+  onResume?: () => void
+  onStop?: () => void
   title?: string
   phases?: readonly string[]
   totalPhases?: number
@@ -27,6 +30,9 @@ export function ReconLogsDrawer({
   currentPhaseNumber,
   status,
   onClearLogs,
+  onPause,
+  onResume,
+  onStop,
   title = 'Reconnaissance Logs',
   phases = RECON_PHASES,
   totalPhases = 7,
@@ -55,6 +61,10 @@ export function ReconLogsDrawer({
       case 'running':
       case 'starting':
         return <div className={styles.runningIndicator} />
+      case 'paused':
+        return <Pause size={14} className={styles.pausedIcon} />
+      case 'stopping':
+        return <Loader2 size={14} className={styles.spinner} />
       case 'completed':
         return <CheckCircle size={14} className={styles.successIcon} />
       case 'error':
@@ -72,6 +82,10 @@ export function ReconLogsDrawer({
         return currentPhase
           ? `Phase ${currentPhaseNumber}/${totalPhases}: ${currentPhase}`
           : 'Running...'
+      case 'paused':
+        return currentPhase
+          ? `Paused — Phase ${currentPhaseNumber}/${totalPhases}: ${currentPhase}`
+          : 'Paused'
       case 'completed':
         return 'Completed'
       case 'error':
@@ -122,13 +136,24 @@ export function ReconLogsDrawer({
           <span className={styles.statusText}>{getStatusText()}</span>
         </div>
         <div className={styles.statusActions}>
-          <button
-            className={styles.iconButton}
-            onClick={() => setAutoScroll(!autoScroll)}
-            title={autoScroll ? 'Pause auto-scroll' : 'Resume auto-scroll'}
-          >
-            {autoScroll ? <Pause size={14} /> : <Play size={14} />}
-          </button>
+          {(status === 'running' || status === 'paused') && (
+            <button
+              className={`${styles.iconButton} ${status === 'paused' ? styles.iconButtonPaused : ''}`}
+              onClick={status === 'paused' ? onResume : onPause}
+              title={status === 'paused' ? 'Resume pipeline' : 'Pause pipeline'}
+            >
+              {status === 'paused' ? <Play size={14} /> : <Pause size={14} />}
+            </button>
+          )}
+          {(status === 'running' || status === 'paused') && (
+            <button
+              className={`${styles.iconButton} ${styles.iconButtonStop}`}
+              onClick={onStop}
+              title="Stop pipeline"
+            >
+              <Square size={14} />
+            </button>
+          )}
           <button
             className={styles.iconButton}
             onClick={onClearLogs}

@@ -1,0 +1,158 @@
+{
+  "target": "samugit83",
+  "scan_start_time": "2026-03-05T20:11:51.486602",
+  "scan_end_time": null,
+  "status": "in_progress",
+  "last_update": "2026-03-05T20:12:51.425037",
+  "statistics": {
+    "repos_scanned": 0,
+    "files_scanned": 85,
+    "commits_scanned": 0,
+    "gists_scanned": 0,
+    "secrets_found": 12,
+    "sensitive_files": 1,
+    "high_entropy": 0
+  },
+  "findings": [
+    {
+      "timestamp": "2026-03-05T20:11:53.327500",
+      "type": "SENSITIVE_FILE",
+      "repository": "samugit83/redamon",
+      "path": ".env.example",
+      "secret_type": "Sensitive Filename",
+      "details": {}
+    },
+    {
+      "timestamp": "2026-03-05T20:12:31.918394",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "agentic/prompts/brute_force_credential_guess_prompts.py",
+      "secret_type": "PostgreSQL Connection String",
+      "details": {
+        "matches": 1,
+        "sample": "postgres://<ip>\n```\n\n#### Redi"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:31.919160",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "agentic/prompts/brute_force_credential_guess_prompts.py",
+      "secret_type": "MySQL Connection String",
+      "details": {
+        "matches": 1,
+        "sample": "mysql://<ip>\n```\n\n#### Po"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:31.923937",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "agentic/prompts/brute_force_credential_guess_prompts.py",
+      "secret_type": "Redis URL",
+      "details": {
+        "matches": 1,
+        "sample": "redis://<ip>\n```\n\n#### HTTP Ba"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:49.437140",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "docker-compose.yml",
+      "secret_type": "PostgreSQL Connection String",
+      "details": {
+        "matches": 1,
+        "sample": "postgresql://${POSTGRES_USER:-redamon}:${POSTGRES_PASSWORD:-redamon_"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.408675",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "MySQL Connection String",
+      "details": {
+        "matches": 1,
+        "sample": "mysql://[^"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.409823",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "Redis URL",
+      "details": {
+        "matches": 1,
+        "sample": "redis://[^"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.416929",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "RSA Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN RSA PRIVATE KEY-----"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.418641",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "DSA Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN DSA PRIVATE KEY-----"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.420055",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "EC Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN EC PRIVATE KEY-----"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.421785",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "OpenSSH Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN OPENSSH PRIVATE KEY-----"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.423467",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "PGP Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+      }
+    },
+    {
+      "timestamp": "2026-03-05T20:12:51.424934",
+      "type": "SECRET",
+      "repository": "samugit83/redamon",
+      "path": "github_secret_hunt/github_secret_hunt.py",
+      "secret_type": "Generic Private Key",
+      "details": {
+        "matches": 1,
+        "sample": "-----BEGIN PRIVATE KEY-----"
+      }
+    }
+  ]
+}

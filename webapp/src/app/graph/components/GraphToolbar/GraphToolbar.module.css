@@ -322,6 +322,45 @@
   cursor: not-allowed;
 }
 
+/* Pause & Stop Buttons */
+.pauseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  color: var(--status-warning);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.pauseButton:hover {
+  background: var(--status-warning);
+  color: white;
+}
+
+.stopButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  color: var(--status-error);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.stopButton:hover {
+  background: var(--status-error);
+  color: white;
+}
+
 /* GVM Scan Button */
 .gvmButton {
   display: flex;

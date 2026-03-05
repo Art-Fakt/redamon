@@ -19,6 +19,8 @@ interface UseReconStatusReturn {
   refetch: () => Promise<void>
   startRecon: () => Promise<ReconState | null>
   stopRecon: () => Promise<ReconState | null>
+  pauseRecon: () => Promise<ReconState | null>
+  resumeRecon: () => Promise<ReconState | null>
 }
 
 const DEFAULT_POLLING_INTERVAL = 5000 // 5 seconds when running
@@ -119,6 +121,7 @@ export function useReconStatus({
     if (!projectId) return null
 
     setIsLoading(true)
+    setState(prev => prev ? { ...prev, status: 'stopping' as ReconState['status'] } : prev)
 
     try {
       const response = await fetch(`/api/recon/${projectId}/stop`, {
@@ -128,6 +131,64 @@ export function useReconStatus({
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to stop recon')
+      }
+
+      const data: ReconState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const pauseRecon = useCallback(async (): Promise<ReconState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/recon/${projectId}/pause`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to pause recon')
+      }
+
+      const data: ReconState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const resumeRecon = useCallback(async (): Promise<ReconState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/recon/${projectId}/resume`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to resume recon')
       }
 
       const data: ReconState = await response.json()
@@ -165,7 +226,7 @@ export function useReconStatus({
       pollingRef.current = null
     }
 
-    const isRunning = state?.status === 'running' || state?.status === 'starting'
+    const isRunning = state?.status === 'running' || state?.status === 'starting' || state?.status === 'paused'
 
     // Use shorter interval when running, longer when idle
     const interval = isRunning ? pollingInterval : IDLE_POLLING_INTERVAL
@@ -187,6 +248,8 @@ export function useReconStatus({
     refetch: fetchStatus,
     startRecon,
     stopRecon,
+    pauseRecon,
+    resumeRecon,
   }
 }
 

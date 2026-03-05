@@ -19,6 +19,8 @@ interface UseGithubHuntStatusReturn {
   refetch: () => Promise<void>
   startGithubHunt: () => Promise<GithubHuntState | null>
   stopGithubHunt: () => Promise<GithubHuntState | null>
+  pauseGithubHunt: () => Promise<GithubHuntState | null>
+  resumeGithubHunt: () => Promise<GithubHuntState | null>
 }
 
 const DEFAULT_POLLING_INTERVAL = 5000
@@ -117,6 +119,7 @@ export function useGithubHuntStatus({
     if (!projectId) return null
 
     setIsLoading(true)
+    setState(prev => prev ? { ...prev, status: 'stopping' as GithubHuntState['status'] } : prev)
 
     try {
       const response = await fetch(`/api/github-hunt/${projectId}/stop`, {
@@ -126,6 +129,64 @@ export function useGithubHuntStatus({
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to stop GitHub Secret Hunt')
+      }
+
+      const data: GithubHuntState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const pauseGithubHunt = useCallback(async (): Promise<GithubHuntState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/github-hunt/${projectId}/pause`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to pause GitHub hunt')
+      }
+
+      const data: GithubHuntState = await response.json()
+      setState(data)
+      return data
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      return null
+
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  const resumeGithubHunt = useCallback(async (): Promise<GithubHuntState | null> => {
+    if (!projectId) return null
+
+    setIsLoading(true)
+
+    try {
+      const response = await fetch(`/api/github-hunt/${projectId}/resume`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to resume GitHub hunt')
       }
 
       const data: GithubHuntState = await response.json()
@@ -161,7 +222,7 @@ export function useGithubHuntStatus({
       pollingRef.current = null
     }
 
-    const isRunning = state?.status === 'running' || state?.status === 'starting'
+    const isRunning = state?.status === 'running' || state?.status === 'starting' || state?.status === 'paused'
     const interval = isRunning ? pollingInterval : IDLE_POLLING_INTERVAL
 
     pollingRef.current = setInterval(fetchStatus, interval)
@@ -181,6 +242,8 @@ export function useGithubHuntStatus({
     refetch: fetchStatus,
     startGithubHunt,
     stopGithubHunt,
+    pauseGithubHunt,
+    resumeGithubHunt,
   }
 }
 

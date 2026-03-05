@@ -2,7 +2,7 @@
  * Types for Recon Process Management
  */
 
-export type ReconStatus = 'idle' | 'starting' | 'running' | 'completed' | 'error' | 'stopping'
+export type ReconStatus = 'idle' | 'starting' | 'running' | 'paused' | 'completed' | 'error' | 'stopping'
 
 export interface ReconState {
   project_id: string
@@ -45,7 +45,7 @@ export type ReconPhase = typeof RECON_PHASES[number]
 // GVM Vulnerability Scan Types
 // =============================================================================
 
-export type GvmStatus = 'idle' | 'starting' | 'running' | 'completed' | 'error' | 'stopping'
+export type GvmStatus = 'idle' | 'starting' | 'running' | 'paused' | 'completed' | 'error' | 'stopping'
 
 export interface GvmState {
   project_id: string
@@ -72,7 +72,7 @@ export type GvmPhase = typeof GVM_PHASES[number]
 // GitHub Secret Hunt Types
 // =============================================================================
 
-export type GithubHuntStatus = 'idle' | 'starting' | 'running' | 'completed' | 'error' | 'stopping'
+export type GithubHuntStatus = 'idle' | 'starting' | 'running' | 'paused' | 'completed' | 'error' | 'stopping'
 
 export interface GithubHuntState {
   project_id: string

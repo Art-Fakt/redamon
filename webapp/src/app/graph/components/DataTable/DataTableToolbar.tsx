@@ -49,6 +49,11 @@ export const DataTableToolbar = memo(function DataTableToolbar({
         />
       </div>
 
+      <button className={styles.exportBtn} onClick={onExport} aria-label="Export to Excel">
+        <Download size={14} />
+        <span>XLSX</span>
+      </button>
+
       <div className={styles.chipActions}>
         <button className={styles.chipAction} onClick={onSelectAllTypes}>All</button>
         <button className={styles.chipAction} onClick={onClearAllTypes}>None</button>
@@ -74,17 +79,11 @@ export const DataTableToolbar = memo(function DataTableToolbar({
         })}
       </div>
 
-      <div className={styles.actions}>
-        <span className={styles.rowCount}>
-          {filteredRows === totalRows
-            ? `${totalRows} nodes`
-            : `${filteredRows} of ${totalRows} nodes`}
-        </span>
-        <button className={styles.exportBtn} onClick={onExport} aria-label="Export to Excel">
-          <Download size={14} />
-          <span>XLSX</span>
-        </button>
-      </div>
+      <span className={styles.rowCount}>
+        {filteredRows === totalRows
+          ? `${totalRows} nodes`
+          : `${filteredRows} of ${totalRows} nodes`}
+      </span>
     </div>
   )
 })

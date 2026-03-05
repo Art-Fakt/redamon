@@ -1,6 +1,6 @@
 'use client'
 
-import { Bot, Play, Download, Loader2, Terminal, Shield, Github, Target, Zap, MessageSquare } from 'lucide-react'
+import { Bot, Play, Download, Loader2, Terminal, Shield, Github, Target, Zap, MessageSquare, Pause, Square } from 'lucide-react'
 import { StealthIcon } from '@/components/icons/StealthIcon'
 import { Toggle } from '@/components/ui'
 import type { ReconStatus, GvmStatus, GithubHuntStatus } from '@/lib/recon-types'
@@ -19,6 +19,9 @@ interface GraphToolbarProps {
   subdomainList?: string[]
   // Recon props
   onStartRecon?: () => void
+  onPauseRecon?: () => void
+  onResumeRecon?: () => void
+  onStopRecon?: () => void
   onDownloadJSON?: () => void
   onToggleLogs?: () => void
   reconStatus?: ReconStatus
@@ -26,6 +29,9 @@ interface GraphToolbarProps {
   isLogsOpen?: boolean
   // GVM props
   onStartGvm?: () => void
+  onPauseGvm?: () => void
+  onResumeGvm?: () => void
+  onStopGvm?: () => void
   onDownloadGvmJSON?: () => void
   onToggleGvmLogs?: () => void
   gvmStatus?: GvmStatus
@@ -33,6 +39,9 @@ interface GraphToolbarProps {
   isGvmLogsOpen?: boolean
   // GitHub Hunt props
   onStartGithubHunt?: () => void
+  onPauseGithubHunt?: () => void
+  onResumeGithubHunt?: () => void
+  onStopGithubHunt?: () => void
   onDownloadGithubHuntJSON?: () => void
   onToggleGithubHuntLogs?: () => void
   githubHuntStatus?: GithubHuntStatus
@@ -65,6 +74,9 @@ export function GraphToolbar({
   subdomainList = [],
   // Recon props
   onStartRecon,
+  onPauseRecon,
+  onResumeRecon,
+  onStopRecon,
   onDownloadJSON,
   onToggleLogs,
   reconStatus = 'idle',
@@ -72,6 +84,9 @@ export function GraphToolbar({
   isLogsOpen = false,
   // GVM props
   onStartGvm,
+  onPauseGvm,
+  onResumeGvm,
+  onStopGvm,
   onDownloadGvmJSON,
   onToggleGvmLogs,
   gvmStatus = 'idle',
@@ -79,6 +94,9 @@ export function GraphToolbar({
   isGvmLogsOpen = false,
   // GitHub Hunt props
   onStartGithubHunt,
+  onPauseGithubHunt,
+  onResumeGithubHunt,
+  onStopGithubHunt,
   onDownloadGithubHuntJSON,
   onToggleGithubHuntLogs,
   githubHuntStatus = 'idle',
@@ -90,9 +108,21 @@ export function GraphToolbar({
   agentActiveCount = 0,
   agentConversations = [],
 }: GraphToolbarProps) {
-  const isReconRunning = reconStatus === 'running' || reconStatus === 'starting'
-  const isGvmRunning = gvmStatus === 'running' || gvmStatus === 'starting'
-  const isGithubHuntRunning = githubHuntStatus === 'running' || githubHuntStatus === 'starting'
+  const isReconBusy = reconStatus === 'running' || reconStatus === 'starting'
+  const isReconStopping = reconStatus === 'stopping'
+  const isReconRunning = isReconBusy || isReconStopping
+  const isReconPaused = reconStatus === 'paused'
+  const isReconActive = isReconRunning || isReconPaused
+  const isGvmBusy = gvmStatus === 'running' || gvmStatus === 'starting'
+  const isGvmStopping = gvmStatus === 'stopping'
+  const isGvmRunning = isGvmBusy || isGvmStopping
+  const isGvmPaused = gvmStatus === 'paused'
+  const isGvmActive = isGvmRunning || isGvmPaused
+  const isGithubHuntBusy = githubHuntStatus === 'running' || githubHuntStatus === 'starting'
+  const isGithubHuntStopping = githubHuntStatus === 'stopping'
+  const isGithubHuntRunning = isGithubHuntBusy || isGithubHuntStopping
+  const isGithubHuntPaused = githubHuntStatus === 'paused'
+  const isGithubHuntActive = isGithubHuntRunning || isGithubHuntPaused
 
   // Agent status derived values
   const runningAgent = agentConversations.find(c => c.agentRunning)
@@ -167,20 +197,41 @@ export function GraphToolbar({
           <>
             <div className={styles.actionGroup}>
               <button
-                className={`${styles.reconButton} ${isReconRunning ? styles.reconButtonActive : ''}`}
-                onClick={onStartRecon}
+                className={`${styles.reconButton} ${isReconActive ? styles.reconButtonActive : ''}`}
+                onClick={isReconPaused ? onResumeRecon : onStartRecon}
                 disabled={isReconRunning}
-                title={isReconRunning ? 'Recon in progress...' : 'Start Reconnaissance'}
+                title={isReconStopping ? 'Stopping...' : isReconRunning ? 'Recon in progress...' : isReconPaused ? 'Resume Recon' : 'Start Reconnaissance'}
               >
                 {isReconRunning ? (
                   <Loader2 size={14} className={styles.spinner} />
                 ) : (
                   <Play size={14} />
                 )}
-                <span>{isReconRunning ? 'Running...' : 'Start Recon'}</span>
+                <span>{isReconStopping ? 'Stopping...' : isReconBusy ? 'Running...' : isReconPaused ? 'Resume' : 'Start Recon'}</span>
               </button>
 
-              {isReconRunning && (
+              {isReconBusy && (
+                <button
+                  className={styles.pauseButton}
+                  onClick={onPauseRecon}
+                  title="Pause Recon"
+                >
+                  <Pause size={14} />
+                </button>
+              )}
+
+              {isReconActive && (
+                <button
+                  className={styles.stopButton}
+                  onClick={onStopRecon}
+                  disabled={isReconStopping}
+                  title="Stop Recon"
+                >
+                  <Square size={14} />
+                </button>
+              )}
+
+              {isReconActive && (
                 <button
                   className={`${styles.logsButton} ${isLogsOpen ? styles.logsButtonActive : ''}`}
                   onClick={onToggleLogs}
@@ -193,7 +244,7 @@ export function GraphToolbar({
               <button
                 className={styles.downloadButton}
                 onClick={onDownloadJSON}
-                disabled={!hasReconData || isReconRunning}
+                disabled={!hasReconData || isReconActive}
                 title={hasReconData ? 'Download Recon JSON' : 'No data available'}
               >
                 <Download size={14} />
@@ -203,16 +254,20 @@ export function GraphToolbar({
             {/* GVM Scan Actions */}
             <div className={styles.actionGroup}>
               <button
-                className={`${styles.gvmButton} ${isGvmRunning ? styles.gvmButtonActive : ''}`}
-                onClick={onStartGvm}
-                disabled={isGvmRunning || !hasReconData || stealthMode}
+                className={`${styles.gvmButton} ${isGvmActive ? styles.gvmButtonActive : ''}`}
+                onClick={isGvmPaused ? onResumeGvm : onStartGvm}
+                disabled={isGvmRunning || (!hasReconData && !isGvmPaused) || (stealthMode && !isGvmPaused)}
                 title={
-                  stealthMode
+                  stealthMode && !isGvmPaused
                     ? 'GVM scanning is disabled in Stealth Mode (generates ~50,000 active probes per target)'
-                    : !hasReconData
+                    : !hasReconData && !isGvmPaused
                     ? 'Run recon first'
+                    : isGvmStopping
+                    ? 'Stopping...'
                     : isGvmRunning
                     ? 'GVM scan in progress...'
+                    : isGvmPaused
+                    ? 'Resume GVM Scan'
                     : 'Start GVM Vulnerability Scan'
                 }
               >
@@ -221,10 +276,31 @@ export function GraphToolbar({
                 ) : (
                   <Shield size={14} />
                 )}
-                <span>{isGvmRunning ? 'Scanning...' : 'GVM Scan'}</span>
+                <span>{isGvmStopping ? 'Stopping...' : isGvmBusy ? 'Scanning...' : isGvmPaused ? 'Resume' : 'GVM Scan'}</span>
               </button>
 
-              {isGvmRunning && (
+              {isGvmBusy && (
+                <button
+                  className={styles.pauseButton}
+                  onClick={onPauseGvm}
+                  title="Pause GVM Scan"
+                >
+                  <Pause size={14} />
+                </button>
+              )}
+
+              {isGvmActive && (
+                <button
+                  className={styles.stopButton}
+                  onClick={onStopGvm}
+                  disabled={isGvmStopping}
+                  title="Stop GVM Scan"
+                >
+                  <Square size={14} />
+                </button>
+              )}
+
+              {isGvmActive && (
                 <button
                   className={`${styles.logsButton} ${isGvmLogsOpen ? styles.logsButtonActive : ''}`}
                   onClick={onToggleGvmLogs}
@@ -237,7 +313,7 @@ export function GraphToolbar({
               <button
                 className={styles.downloadButton}
                 onClick={onDownloadGvmJSON}
-                disabled={!hasGvmData || isGvmRunning}
+                disabled={!hasGvmData || isGvmActive}
                 title={hasGvmData ? 'Download GVM JSON' : 'No GVM data available'}
               >
                 <Download size={14} />
@@ -247,14 +323,18 @@ export function GraphToolbar({
             {/* GitHub Secret Hunt Actions */}
             <div className={styles.actionGroup}>
               <button
-                className={`${styles.githubHuntButton} ${isGithubHuntRunning ? styles.githubHuntButtonActive : ''}`}
-                onClick={onStartGithubHunt}
-                disabled={isGithubHuntRunning || !hasReconData}
+                className={`${styles.githubHuntButton} ${isGithubHuntActive ? styles.githubHuntButtonActive : ''}`}
+                onClick={isGithubHuntPaused ? onResumeGithubHunt : onStartGithubHunt}
+                disabled={isGithubHuntRunning || (!hasReconData && !isGithubHuntPaused)}
                 title={
-                  !hasReconData
+                  !hasReconData && !isGithubHuntPaused
                     ? 'Run recon first'
+                    : isGithubHuntStopping
+                    ? 'Stopping...'
                     : isGithubHuntRunning
                     ? 'GitHub hunt in progress...'
+                    : isGithubHuntPaused
+                    ? 'Resume GitHub Hunt'
                     : 'Start GitHub Secret Hunt'
                 }
               >
@@ -263,10 +343,31 @@ export function GraphToolbar({
                 ) : (
                   <Github size={14} />
                 )}
-                <span>{isGithubHuntRunning ? 'Hunting...' : 'GitHub Hunt'}</span>
+                <span>{isGithubHuntStopping ? 'Stopping...' : isGithubHuntBusy ? 'Hunting...' : isGithubHuntPaused ? 'Resume' : 'GitHub Hunt'}</span>
               </button>
 
-              {isGithubHuntRunning && (
+              {isGithubHuntBusy && (
+                <button
+                  className={styles.pauseButton}
+                  onClick={onPauseGithubHunt}
+                  title="Pause GitHub Hunt"
+                >
+                  <Pause size={14} />
+                </button>
+              )}
+
+              {isGithubHuntActive && (
+                <button
+                  className={styles.stopButton}
+                  onClick={onStopGithubHunt}
+                  disabled={isGithubHuntStopping}
+                  title="Stop GitHub Hunt"
+                >
+                  <Square size={14} />
+                </button>
+              )}
+
+              {isGithubHuntActive && (
                 <button
                   className={`${styles.logsButton} ${isGithubHuntLogsOpen ? styles.logsButtonActive : ''}`}
                   onClick={onToggleGithubHuntLogs}
@@ -279,7 +380,7 @@ export function GraphToolbar({
               <button
                 className={styles.downloadButton}
                 onClick={onDownloadGithubHuntJSON}
-                disabled={!hasGithubHuntData || isGithubHuntRunning}
+                disabled={!hasGithubHuntData || isGithubHuntActive}
                 title={hasGithubHuntData ? 'Download GitHub Hunt JSON' : 'No GitHub hunt data available'}
               >
                 <Download size={14} />

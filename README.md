@@ -12,7 +12,7 @@
 <br/>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/v2.3.0-release-2E8B57?style=for-the-badge" alt="Version 2.3.0"/>
+  <img src="https://img.shields.io/badge/v2.2.0-release-2E8B57?style=for-the-badge" alt="Version 2.2.0"/>
   <img src="https://img.shields.io/badge/WARNING-SECURITY%20TOOL-B22222?style=for-the-badge" alt="Security Tool Warning"/>
   <img src="https://img.shields.io/badge/LICENSE-MIT-4169A1?style=for-the-badge" alt="MIT License"/>
   <br/>
