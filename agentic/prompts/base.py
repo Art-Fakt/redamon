@@ -749,13 +749,9 @@ Keep it concise — 2-3 short sections maximum. No "Limitations" section unless 
 
 def determine_response_tier(
     execution_trace: list,
-    current_phase: str,
     attack_path_type: str,
-    phase_history: list,
     target_info: dict,
     objective_history: list,
-    current_objective_index: int,
-    conversation_objectives: list,
 ) -> str:
     """Determine the response tier based on state signals.
 
