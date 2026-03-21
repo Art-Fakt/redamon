@@ -401,8 +401,10 @@ services:
       GVM_OUTPUT_PATH: /data/gvm-output
       GITHUB_HUNT_OUTPUT_PATH: /data/github-hunt-output
       REPORT_OUTPUT_PATH: /data/reports
+      WORDLIST_UPLOAD_PATH: /data/recon-wordlists
     volumes:
       - ./recon/output:/data/recon-output:ro
+      - ./recon/wordlists:/data/recon-wordlists:rw
       - ./gvm_scan/output:/data/gvm-output:ro
       - ./github_secret_hunt/output:/data/github-hunt-output:ro
       - report_data:/data/reports

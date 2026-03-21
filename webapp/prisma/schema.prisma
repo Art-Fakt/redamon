@@ -238,6 +238,24 @@ model Project {
   jsluiceExtractSecrets       Boolean  @default(true) @map("jsluice_extract_secrets")
   jsluiceConcurrency          Int      @default(5) @map("jsluice_concurrency")
 
+  // ========== FFUF DIRECTORY FUZZER ==========
+  ffufEnabled                 Boolean  @default(false) @map("ffuf_enabled")
+  ffufWordlist                String   @default("/usr/share/seclists/Discovery/Web-Content/common.txt") @map("ffuf_wordlist")
+  ffufThreads                 Int      @default(40) @map("ffuf_threads")
+  ffufRate                    Int      @default(0) @map("ffuf_rate")
+  ffufTimeout                 Int      @default(10) @map("ffuf_timeout")
+  ffufMaxTime                 Int      @default(600) @map("ffuf_max_time")
+  ffufMatchCodes              Int[]    @default([200, 201, 204, 301, 302, 307, 308, 401, 403, 405]) @map("ffuf_match_codes")
+  ffufFilterCodes             Int[]    @default([]) @map("ffuf_filter_codes")
+  ffufFilterSize              String   @default("") @map("ffuf_filter_size")
+  ffufExtensions              String[] @default([]) @map("ffuf_extensions")
+  ffufRecursion               Boolean  @default(false) @map("ffuf_recursion")
+  ffufRecursionDepth          Int      @default(2) @map("ffuf_recursion_depth")
+  ffufAutoCalibrate           Boolean  @default(true) @map("ffuf_auto_calibrate")
+  ffufFollowRedirects         Boolean  @default(false) @map("ffuf_follow_redirects")
+  ffufCustomHeaders           String[] @default([]) @map("ffuf_custom_headers")
+  ffufSmartFuzz               Boolean  @default(true) @map("ffuf_smart_fuzz")
+
   // ========== GAU PASSIVE URL DISCOVERY ==========
   gauEnabled                  Boolean  @default(false) @map("gau_enabled")
   gauDockerImage              String   @default("sxcurity/gau:latest") @map("gau_docker_image")

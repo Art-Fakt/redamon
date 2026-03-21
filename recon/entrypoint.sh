@@ -105,6 +105,7 @@ fi
 # =============================================================================
 echo -e "${YELLOW}[*] Ensuring output directories exist...${NC}"
 mkdir -p /app/recon/output
+mkdir -p /app/recon/wordlists
 mkdir -p /app/recon/data/mitre_db
 mkdir -p /app/recon/data/wappalyzer
 echo -e "${GREEN}[+] Directories ready${NC}"

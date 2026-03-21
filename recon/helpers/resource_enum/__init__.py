@@ -66,6 +66,13 @@ from .jsluice_helpers import (
     merge_jsluice_into_by_base_url,
 )
 
+# FFuf helpers
+from .ffuf_helpers import (
+    run_ffuf_discovery,
+    pull_ffuf_binary_check,
+    merge_ffuf_into_by_base_url,
+)
+
 # Endpoint organization
 from .endpoint_helpers import (
     organize_endpoints,
@@ -105,6 +112,10 @@ __all__ = [
     # jsluice
     "run_jsluice_analysis",
     "merge_jsluice_into_by_base_url",
+    # FFuf
+    "run_ffuf_discovery",
+    "pull_ffuf_binary_check",
+    "merge_ffuf_into_by_base_url",
     # Endpoint organization
     "organize_endpoints",
 ]

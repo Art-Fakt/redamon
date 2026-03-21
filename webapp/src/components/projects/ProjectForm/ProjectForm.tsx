@@ -15,6 +15,7 @@ import { NucleiSection } from './sections/NucleiSection'
 import { KatanaSection } from './sections/KatanaSection'
 import { HakrawlerSection } from './sections/HakrawlerSection'
 import { JsluiceSection } from './sections/JsluiceSection'
+import { FfufSection } from './sections/FfufSection'
 import { GauSection } from './sections/GauSection'
 import { KiterunnerSection } from './sections/KiterunnerSection'
 import { CveLookupSection } from './sections/CveLookupSection'
@@ -52,6 +53,8 @@ interface ProjectFormProps {
   onCancel: () => void
   isSubmitting?: boolean
   mode: 'create' | 'edit'
+  /** When set (e.g. from /projects/[id]/settings URL), ensures child sections always get a stable project id */
+  projectIdFromRoute?: string
 }
 
 const TAB_GROUPS = [
@@ -132,7 +135,8 @@ export function ProjectForm({
   onSubmit,
   onCancel,
   isSubmitting = false,
-  mode
+  mode,
+  projectIdFromRoute,
 }: ProjectFormProps) {
   const [activeTab, setActiveTab] = useState<TabId>('target')
   const [isLoadingDefaults, setIsLoadingDefaults] = useState(mode === 'create')
@@ -151,8 +155,9 @@ export function ProjectForm({
   // RoE document file (held in memory until project creation)
   const [roeFile, setRoeFile] = useState<File | null>(null)
 
-  // Extract project ID for edit mode (to exclude from conflict check)
-  const projectId = (initialData as { id?: string } | undefined)?.id
+  // Prefer URL param on settings page so wordlist upload etc. always get a real id
+  const projectId =
+    projectIdFromRoute ?? (initialData as { id?: string } | undefined)?.id
 
   // Check for domain conflicts (IP mode skips — tenant-scoped constraints allow overlap)
   const checkConflict = useCallback(async () => {
@@ -404,6 +409,7 @@ export function ProjectForm({
             <KatanaSection data={formData} updateField={updateField} />
             <HakrawlerSection data={formData} updateField={updateField} />
             <JsluiceSection data={formData} updateField={updateField} />
+            <FfufSection data={formData} updateField={updateField} projectId={projectId} mode={mode} />
             <GauSection data={formData} updateField={updateField} />
             <KiterunnerSection data={formData} updateField={updateField} />
           </>

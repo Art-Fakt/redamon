@@ -10,14 +10,16 @@ Features:
 - GAU passive URL discovery from archives (passive)
   - Wayback Machine, Common Crawl, OTX, URLScan
 - jsluice JavaScript analysis for hidden URLs and secrets (passive)
+- FFuf directory fuzzing for hidden content discovery (active)
 - HTML form parsing for POST endpoints
 - Parameter extraction and classification
 - Endpoint categorization (auth, file_access, api, dynamic, static, admin)
 - Parameter type detection (id, file, search, auth params)
 - Parallel execution of Katana + Hakrawler + GAU with merged results
 - jsluice post-crawl analysis on discovered JS files
+- FFuf post-crawl directory fuzzing with smart base path targeting
 
-Pipeline: http_probe -> resource_enum (Katana + Hakrawler + GAU parallel, then jsluice) -> vuln_scan
+Pipeline: http_probe -> resource_enum (Katana + Hakrawler + GAU parallel, then jsluice, then FFuf) -> vuln_scan
 """
 
 import json
@@ -64,6 +66,10 @@ from recon.helpers.resource_enum import (
     # jsluice helpers
     run_jsluice_analysis,
     merge_jsluice_into_by_base_url,
+    # FFuf helpers
+    run_ffuf_discovery,
+    pull_ffuf_binary_check,
+    merge_ffuf_into_by_base_url,
     # Endpoint organization
     organize_endpoints,
 )
@@ -93,7 +99,7 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
     """
     print("\n" + "=" * 70)
     print("[*][ResourceEnum] RedAmon - Resource Enumeration")
-    print("[*][ResourceEnum] (Katana + Hakrawler + GAU + jsluice + Kiterunner)")
+    print("[*][ResourceEnum] (Katana + Hakrawler + GAU + jsluice + FFuf + Kiterunner)")
     print("=" * 70)
 
     # Use passed settings or empty dict as fallback
@@ -131,6 +137,24 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
     JSLUICE_EXTRACT_URLS = settings.get('JSLUICE_EXTRACT_URLS', True)
     JSLUICE_EXTRACT_SECRETS = settings.get('JSLUICE_EXTRACT_SECRETS', True)
     JSLUICE_CONCURRENCY = settings.get('JSLUICE_CONCURRENCY', 5)
+
+    # FFuf settings
+    FFUF_ENABLED = settings.get('FFUF_ENABLED', False)
+    FFUF_WORDLIST = settings.get('FFUF_WORDLIST', '/usr/share/seclists/Discovery/Web-Content/common.txt')
+    FFUF_THREADS = settings.get('FFUF_THREADS', 40)
+    FFUF_RATE = settings.get('FFUF_RATE', 0)
+    FFUF_TIMEOUT = settings.get('FFUF_TIMEOUT', 10)
+    FFUF_MAX_TIME = settings.get('FFUF_MAX_TIME', 600)
+    FFUF_MATCH_CODES = settings.get('FFUF_MATCH_CODES', [200, 201, 204, 301, 302, 307, 308, 401, 403, 405])
+    FFUF_FILTER_CODES = settings.get('FFUF_FILTER_CODES', [])
+    FFUF_FILTER_SIZE = settings.get('FFUF_FILTER_SIZE', '')
+    FFUF_EXTENSIONS = settings.get('FFUF_EXTENSIONS', [])
+    FFUF_RECURSION = settings.get('FFUF_RECURSION', False)
+    FFUF_RECURSION_DEPTH = settings.get('FFUF_RECURSION_DEPTH', 2)
+    FFUF_AUTO_CALIBRATE = settings.get('FFUF_AUTO_CALIBRATE', True)
+    FFUF_FOLLOW_REDIRECTS = settings.get('FFUF_FOLLOW_REDIRECTS', False)
+    FFUF_CUSTOM_HEADERS = settings.get('FFUF_CUSTOM_HEADERS', [])
+    FFUF_SMART_FUZZ = settings.get('FFUF_SMART_FUZZ', True)
 
     # GAU settings - disable in IP mode (archives index by domain, not IP)
     ip_mode = recon_data.get("metadata", {}).get("ip_mode", False)
@@ -296,6 +320,19 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
         print(f"[*][jsluice] Timeout: {JSLUICE_TIMEOUT}s")
         print(f"[*][jsluice] Extract URLs: {JSLUICE_EXTRACT_URLS}")
         print(f"[*][jsluice] Extract secrets: {JSLUICE_EXTRACT_SECRETS}")
+    # FFuf settings
+    print(f"[*][FFuf] Enabled: {FFUF_ENABLED}")
+    if FFUF_ENABLED:
+        print(f"[*][FFuf] Wordlist: {FFUF_WORDLIST}")
+        print(f"[*][FFuf] Threads: {FFUF_THREADS}")
+        print(f"[*][FFuf] Rate limit: {FFUF_RATE} req/s" if FFUF_RATE > 0 else "[*][FFuf] Rate limit: unlimited")
+        print(f"[*][FFuf] Timeout: {FFUF_TIMEOUT}s per request, {FFUF_MAX_TIME}s max")
+        print(f"[*][FFuf] Auto-calibrate: {FFUF_AUTO_CALIBRATE}")
+        print(f"[*][FFuf] Smart fuzz: {FFUF_SMART_FUZZ}")
+        if FFUF_EXTENSIONS:
+            print(f"[*][FFuf] Extensions: {', '.join(FFUF_EXTENSIONS)}")
+        if FFUF_RECURSION:
+            print(f"[*][FFuf] Recursion: depth {FFUF_RECURSION_DEPTH}")
     # GAU settings
     print(f"[*][GAU] Enabled: {GAU_ENABLED}")
     if GAU_ENABLED:
@@ -334,6 +371,8 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
     gau_urls = []
     gau_urls_by_domain = {}
     kr_results = []
+    ffuf_results = []
+    ffuf_meta = {}
     jsluice_result = {"urls": [], "secrets": [], "external_domains": []}
 
     # Run Katana, Hakrawler, and GAU in parallel first (if enabled)
@@ -519,6 +558,62 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
                 print(f"[+][jsluice] New endpoints: {jsluice_stats['jsluice_new']}")
                 print(f"[+][jsluice] Overlap: {jsluice_stats['jsluice_overlap']}")
 
+    # FFuf directory fuzzing (runs after crawlers and jsluice, before GAU merge)
+    ffuf_stats = {
+        "ffuf_total": 0,
+        "ffuf_new": 0,
+        "ffuf_overlap": 0,
+    }
+
+    if FFUF_ENABLED:
+        if pull_ffuf_binary_check():
+            discovered_base_paths = None
+            if FFUF_SMART_FUZZ:
+                base_paths = set()
+                for base_url, base_data in organized_data['by_base_url'].items():
+                    for path in base_data.get('endpoints', {}).keys():
+                        parts = path.strip('/').split('/')
+                        if len(parts) >= 2:
+                            base_paths.add('/'.join(parts[:2]))
+                        if len(parts) >= 1 and parts[0]:
+                            base_paths.add(parts[0])
+                if base_paths:
+                    discovered_base_paths = sorted(base_paths)[:20]
+                    print(f"[*][FFuf] Smart fuzz: targeting {len(discovered_base_paths)} discovered base paths")
+
+            ffuf_results, ffuf_meta = run_ffuf_discovery(
+                target_urls,
+                FFUF_WORDLIST,
+                FFUF_THREADS,
+                FFUF_RATE,
+                FFUF_TIMEOUT,
+                FFUF_MAX_TIME,
+                FFUF_MATCH_CODES,
+                FFUF_FILTER_CODES,
+                FFUF_FILTER_SIZE,
+                FFUF_EXTENSIONS,
+                FFUF_RECURSION,
+                FFUF_RECURSION_DEPTH,
+                FFUF_AUTO_CALIBRATE,
+                FFUF_CUSTOM_HEADERS,
+                FFUF_FOLLOW_REDIRECTS,
+                target_domains,
+                discovered_base_paths,
+                use_proxy,
+            )
+
+            if ffuf_results:
+                print("\n[*][FFuf] Merging discovered endpoints into results...")
+                organized_data['by_base_url'], ffuf_stats = merge_ffuf_into_by_base_url(
+                    ffuf_results,
+                    organized_data['by_base_url'],
+                )
+                print(f"[+][FFuf] Total: {ffuf_stats['ffuf_total']} endpoints")
+                print(f"[+][FFuf] New endpoints: {ffuf_stats['ffuf_new']}")
+                print(f"[+][FFuf] Overlap with crawlers: {ffuf_stats['ffuf_overlap']}")
+        else:
+            print("[!][FFuf] ffuf binary not found in PATH, skipping")
+
     # Merge GAU results if available
     gau_stats = {
         "gau_total": 0,
@@ -676,8 +771,9 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
 
     # Combine all discovered URLs (deduplicated, in-scope only)
     jsluice_in_scope_urls = jsluice_result.get("urls", []) if JSLUICE_ENABLED else []
+    ffuf_discovered_urls = [r["url"] for r in ffuf_results] if FFUF_ENABLED else []
     all_discovered_urls = sorted(set(
-        katana_urls + hakrawler_urls + in_scope_gau + urlscan_urls + jsluice_in_scope_urls
+        katana_urls + hakrawler_urls + in_scope_gau + urlscan_urls + jsluice_in_scope_urls + ffuf_discovered_urls
     ))
 
     # Build result structure
@@ -707,6 +803,14 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
             'jsluice_urls_found': len(jsluice_in_scope_urls),
             'jsluice_secrets_found': len(jsluice_result.get("secrets", [])),
             'jsluice_stats': jsluice_stats,
+            # FFuf metadata
+            'ffuf_enabled': FFUF_ENABLED,
+            'ffuf_wordlist': FFUF_WORDLIST if FFUF_ENABLED else None,
+            'ffuf_threads': FFUF_THREADS if FFUF_ENABLED else None,
+            'ffuf_rate': FFUF_RATE if FFUF_ENABLED else None,
+            'ffuf_endpoints_found': len(ffuf_results) if FFUF_ENABLED else 0,
+            'ffuf_smart_fuzz': FFUF_SMART_FUZZ if FFUF_ENABLED else None,
+            'ffuf_stats': ffuf_stats,
             # GAU metadata
             'gau_enabled': GAU_ENABLED,
             'gau_docker_image': GAU_DOCKER_IMAGE if GAU_ENABLED else None,
@@ -755,6 +859,9 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
             'jsluice_new_endpoints': jsluice_stats['jsluice_new'],
             'jsluice_overlap': jsluice_stats['jsluice_overlap'],
             'jsluice_secrets_count': len(jsluice_result.get("secrets", [])),
+            'from_ffuf': len(ffuf_results) if FFUF_ENABLED else 0,
+            'ffuf_new_endpoints': ffuf_stats['ffuf_new'],
+            'ffuf_overlap': ffuf_stats['ffuf_overlap'],
             'from_gau_total': len(gau_urls),  # All URLs found by GAU
             'from_gau_in_scope': len(in_scope_gau),  # Only in-scope URLs
             'gau_new_endpoints': gau_stats['gau_new'],
@@ -773,6 +880,7 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
             + katana_meta.get("external_domains", [])
             + hakrawler_meta.get("external_domains", [])
             + jsluice_result.get("external_domains", [])
+            + ffuf_meta.get("external_domains", [])
         ),
     }
 
@@ -806,6 +914,10 @@ def run_resource_enum(recon_data: dict, output_file: Optional[Path] = None, sett
     print(f"[+][jsluice] JS analysis: {len(jsluice_in_scope_urls)} URLs, {len(jsluice_result.get('secrets', []))} secrets" if JSLUICE_ENABLED else "[+][jsluice] JS analysis: disabled")
     if JSLUICE_ENABLED and jsluice_in_scope_urls:
         print(f"[+][jsluice] New endpoints: {jsluice_stats['jsluice_new']}")
+    print(f"[+][FFuf] Directory fuzzing: {len(ffuf_results) if FFUF_ENABLED else 'disabled'}")
+    if FFUF_ENABLED and ffuf_results:
+        print(f"[+][FFuf] New endpoints: {ffuf_stats['ffuf_new']}")
+        print(f"[+][FFuf] Overlap: {ffuf_stats['ffuf_overlap']}")
     print(f"[+][GAU] Passive archive: {len(gau_urls) if GAU_ENABLED else 'disabled'}")
     if GAU_ENABLED and gau_urls:
         print(f"[+][GAU] New endpoints: {gau_stats['gau_new']}")

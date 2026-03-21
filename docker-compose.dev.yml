@@ -18,6 +18,7 @@ services:
       - webapp_node_modules:/app/node_modules
       - webapp_next_cache:/app/.next
       - ./recon/output:/data/recon-output:ro
+      - ./recon/wordlists:/data/recon-wordlists:rw
       - ./gvm_scan/output:/data/gvm-output:ro
       - ./github_secret_hunt/output:/data/github-hunt-output:ro
 

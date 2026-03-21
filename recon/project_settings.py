@@ -244,6 +244,24 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'JSLUICE_EXTRACT_SECRETS': True,
     'JSLUICE_CONCURRENCY': 5,
 
+    # FFuf Directory Fuzzer
+    'FFUF_ENABLED': False,
+    'FFUF_WORDLIST': '/usr/share/seclists/Discovery/Web-Content/common.txt',
+    'FFUF_THREADS': 40,
+    'FFUF_RATE': 0,
+    'FFUF_TIMEOUT': 10,
+    'FFUF_MAX_TIME': 600,
+    'FFUF_MATCH_CODES': [200, 201, 204, 301, 302, 307, 308, 401, 403, 405],
+    'FFUF_FILTER_CODES': [],
+    'FFUF_FILTER_SIZE': '',
+    'FFUF_EXTENSIONS': [],
+    'FFUF_RECURSION': False,
+    'FFUF_RECURSION_DEPTH': 2,
+    'FFUF_AUTO_CALIBRATE': True,
+    'FFUF_FOLLOW_REDIRECTS': False,
+    'FFUF_CUSTOM_HEADERS': [],
+    'FFUF_SMART_FUZZ': True,
+
     # Kiterunner API Discovery
     'KITERUNNER_ENABLED': True,
     'KITERUNNER_WORDLISTS': ['routes-large'],
@@ -551,6 +569,24 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
     settings['JSLUICE_EXTRACT_SECRETS'] = project.get('jsluiceExtractSecrets', DEFAULT_SETTINGS['JSLUICE_EXTRACT_SECRETS'])
     settings['JSLUICE_CONCURRENCY'] = project.get('jsluiceConcurrency', DEFAULT_SETTINGS['JSLUICE_CONCURRENCY'])
 
+    # FFuf Directory Fuzzer
+    settings['FFUF_ENABLED'] = project.get('ffufEnabled', DEFAULT_SETTINGS['FFUF_ENABLED'])
+    settings['FFUF_WORDLIST'] = project.get('ffufWordlist', DEFAULT_SETTINGS['FFUF_WORDLIST'])
+    settings['FFUF_THREADS'] = project.get('ffufThreads', DEFAULT_SETTINGS['FFUF_THREADS'])
+    settings['FFUF_RATE'] = project.get('ffufRate', DEFAULT_SETTINGS['FFUF_RATE'])
+    settings['FFUF_TIMEOUT'] = project.get('ffufTimeout', DEFAULT_SETTINGS['FFUF_TIMEOUT'])
+    settings['FFUF_MAX_TIME'] = project.get('ffufMaxTime', DEFAULT_SETTINGS['FFUF_MAX_TIME'])
+    settings['FFUF_MATCH_CODES'] = project.get('ffufMatchCodes', DEFAULT_SETTINGS['FFUF_MATCH_CODES'])
+    settings['FFUF_FILTER_CODES'] = project.get('ffufFilterCodes', DEFAULT_SETTINGS['FFUF_FILTER_CODES'])
+    settings['FFUF_FILTER_SIZE'] = project.get('ffufFilterSize', DEFAULT_SETTINGS['FFUF_FILTER_SIZE'])
+    settings['FFUF_EXTENSIONS'] = project.get('ffufExtensions', DEFAULT_SETTINGS['FFUF_EXTENSIONS'])
+    settings['FFUF_RECURSION'] = project.get('ffufRecursion', DEFAULT_SETTINGS['FFUF_RECURSION'])
+    settings['FFUF_RECURSION_DEPTH'] = project.get('ffufRecursionDepth', DEFAULT_SETTINGS['FFUF_RECURSION_DEPTH'])
+    settings['FFUF_AUTO_CALIBRATE'] = project.get('ffufAutoCalibrate', DEFAULT_SETTINGS['FFUF_AUTO_CALIBRATE'])
+    settings['FFUF_FOLLOW_REDIRECTS'] = project.get('ffufFollowRedirects', DEFAULT_SETTINGS['FFUF_FOLLOW_REDIRECTS'])
+    settings['FFUF_CUSTOM_HEADERS'] = project.get('ffufCustomHeaders', DEFAULT_SETTINGS['FFUF_CUSTOM_HEADERS'])
+    settings['FFUF_SMART_FUZZ'] = project.get('ffufSmartFuzz', DEFAULT_SETTINGS['FFUF_SMART_FUZZ'])
+
     # GAU Passive URL Discovery
     settings['GAU_ENABLED'] = project.get('gauEnabled', DEFAULT_SETTINGS['GAU_ENABLED'])
     settings['GAU_DOCKER_IMAGE'] = project.get('gauDockerImage', DEFAULT_SETTINGS['GAU_DOCKER_IMAGE'])
@@ -711,10 +747,17 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
             'NAABU_RATE_LIMIT', 'HTTPX_RATE_LIMIT', 'NUCLEI_RATE_LIMIT',
             'KATANA_RATE_LIMIT', 'GAU_VERIFY_RATE_LIMIT', 'GAU_METHOD_DETECT_RATE_LIMIT',
             'KITERUNNER_RATE_LIMIT', 'KITERUNNER_METHOD_DETECT_RATE_LIMIT',
+            'FFUF_RATE',
             'PUREDNS_RATE_LIMIT',
         ]
         for key in RATE_LIMIT_KEYS:
-            if key in settings and settings[key] > roe_max_rps:
+            if key not in settings:
+                continue
+            # FFUF_RATE uses 0 to mean "unlimited" — must be capped under RoE
+            if settings[key] == 0 and key == 'FFUF_RATE':
+                logger.info(f"RoE: capping {key} from unlimited (0) to {roe_max_rps} rps")
+                settings[key] = roe_max_rps
+            elif settings[key] > roe_max_rps:
                 logger.info(f"RoE: capping {key} from {settings[key]} to {roe_max_rps} rps")
                 settings[key] = roe_max_rps
 
@@ -844,6 +887,9 @@ def apply_stealth_overrides(settings: dict[str, Any]) -> dict[str, Any]:
 
     # --- jsluice: keep enabled (passive) but reduce file count ---
     settings['JSLUICE_MAX_FILES'] = 20
+
+    # --- FFuf: DISABLED (active directory brute-force) ---
+    settings['FFUF_ENABLED'] = False
 
     # --- Kiterunner: DISABLED (active brute-force API discovery) ---
     settings['KITERUNNER_ENABLED'] = False

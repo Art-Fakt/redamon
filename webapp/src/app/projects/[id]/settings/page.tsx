@@ -73,6 +73,7 @@ export default function ProjectSettingsPage() {
       <ProjectForm
         mode="edit"
         initialData={project}
+        projectIdFromRoute={projectId}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={updateProjectMutation.isPending}
