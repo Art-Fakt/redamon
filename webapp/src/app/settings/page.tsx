@@ -523,7 +523,61 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Section 2: API Keys (User-Scoped) */}
+      {/* Section 2: Agent Skills */}
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}><Swords size={16} /> Agent Skills</h2>
+          <label className="primaryButton" style={{ cursor: 'pointer' }}>
+            <Upload size={14} /> Upload Skill
+            <input
+              type="file"
+              accept=".md"
+              style={{ display: 'none' }}
+              onChange={handleSkillUpload}
+            />
+          </label>
+        </div>
+        <p className={styles.sectionHint}>
+          Upload .md files defining custom attack skill workflows. Skills become available as toggles in all project settings.
+          {' '}Browse <a href="https://github.com/samugit83/redamon/wiki/Attack-Skills#community-skills" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}>community skills</a> for ready-to-use templates.
+        </p>
+
+        {skillsLoading ? (
+          <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} /> Loading...</div>
+        ) : attackSkills.length === 0 ? (
+          <div className={styles.emptyState}>No custom skills uploaded yet. Upload a .md file to get started.</div>
+        ) : (
+          <div className={styles.providerList}>
+            {attackSkills.map(skill => (
+              <div key={skill.id} className={styles.providerCard}>
+                <span className={styles.providerIcon}><Swords size={16} /></span>
+                <div className={styles.providerInfo}>
+                  <div className={styles.providerName}>{skill.name}</div>
+                  <div className={styles.providerMeta}>
+                    {skill.description || <span style={{ opacity: 0.5, fontStyle: 'italic' }}>No description</span>}
+                  </div>
+                  <div className={styles.providerMeta}>
+                    Uploaded {new Date(skill.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className={styles.providerActions}>
+                  <button className="iconButton" title="Edit description" onClick={() => openEditDescription(skill.id)}>
+                    <Pencil size={14} />
+                  </button>
+                  <button className="iconButton" title="Download" onClick={() => downloadSkill(skill.id, skill.name)}>
+                    <Download size={14} />
+                  </button>
+                  <button className="iconButton" title="Delete" onClick={() => deleteSkill(skill.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section 3: API Keys (User-Scoped) */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>API Keys</h2>
@@ -717,7 +771,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Section 3: Tunneling */}
+      {/* Section 4: Tunneling */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Tunneling</h2>
@@ -766,59 +820,6 @@ export default function SettingsPage() {
             <button className="primaryButton" onClick={saveSettings} disabled={settingsSaving}>
               Save Settings
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* Section 4: Agent Skills */}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}><Swords size={16} /> Agent Skills</h2>
-          <label className="primaryButton" style={{ cursor: 'pointer' }}>
-            <Upload size={14} /> Upload Skill
-            <input
-              type="file"
-              accept=".md"
-              style={{ display: 'none' }}
-              onChange={handleSkillUpload}
-            />
-          </label>
-        </div>
-        <p className={styles.sectionHint}>
-          Upload .md files defining custom attack skill workflows. Skills become available as toggles in all project settings.
-        </p>
-
-        {skillsLoading ? (
-          <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} /> Loading...</div>
-        ) : attackSkills.length === 0 ? (
-          <div className={styles.emptyState}>No custom skills uploaded yet. Upload a .md file to get started.</div>
-        ) : (
-          <div className={styles.providerList}>
-            {attackSkills.map(skill => (
-              <div key={skill.id} className={styles.providerCard}>
-                <span className={styles.providerIcon}><Swords size={16} /></span>
-                <div className={styles.providerInfo}>
-                  <div className={styles.providerName}>{skill.name}</div>
-                  <div className={styles.providerMeta}>
-                    {skill.description || <span style={{ opacity: 0.5, fontStyle: 'italic' }}>No description</span>}
-                  </div>
-                  <div className={styles.providerMeta}>
-                    Uploaded {new Date(skill.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-                <div className={styles.providerActions}>
-                  <button className="iconButton" title="Edit description" onClick={() => openEditDescription(skill.id)}>
-                    <Pencil size={14} />
-                  </button>
-                  <button className="iconButton" title="Download" onClick={() => downloadSkill(skill.id, skill.name)}>
-                    <Download size={14} />
-                  </button>
-                  <button className="iconButton" title="Delete" onClick={() => deleteSkill(skill.id)}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>

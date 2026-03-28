@@ -124,8 +124,8 @@ RUN git clone --depth 1 https://github.com/swisskyrepo/GraphQLmap.git /opt/graph
     && pip install --no-cache-dir requests \
     && pip install --no-cache-dir -e .
 
-# Remove Python httpx if installed as dependency (conflicts with ProjectDiscovery's Go httpx)
-RUN pip uninstall -y httpx 2>/dev/null || true
+# Ensure ProjectDiscovery Go httpx wins over Python httpx CLI wrapper in PATH
+RUN ln -sf /root/go/bin/httpx /opt/venv/bin/httpx
 
 # Create directories
 RUN mkdir -p /opt/mcp_servers /opt/output

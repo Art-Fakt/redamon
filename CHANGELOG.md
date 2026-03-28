@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.1] - 2026-03-28
+
+### Added
+
+- **API Security Testing Tools in Kali Sandbox** -- 5 new tools available via `kali_shell` for API security testing:
+  - **ffuf** v2.1.0 -- fast web fuzzer for API endpoint/parameter discovery ([MIT](https://github.com/ffuf/ffuf))
+  - **httpx** v1.9.0 (ProjectDiscovery) -- HTTP probing, tech detection, header analysis ([MIT](https://github.com/projectdiscovery/httpx))
+  - **jwt_tool** v2.3.0 -- JWT exploitation: alg:none, key confusion, secret cracking ([GPL-3.0](https://github.com/ticarpi/jwt_tool))
+  - **graphql-cop** -- GraphQL security auditor ([BSD-3-Clause](https://github.com/dolevf/graphql-cop))
+  - **graphqlmap** -- GraphQL exploitation scripting engine ([MIT](https://github.com/swisskyrepo/GraphQLmap))
+
+- **Community Skills** -- new section in wiki and Global Settings UI linking to community-contributed attack skill templates (API testing, XSS, SQLi, SSRF)
+
+### Fixed
+
+- **httpx PATH shadowing** -- ProjectDiscovery Go httpx was shadowed by Python httpx CLI wrapper in the Kali sandbox PATH; fixed via symlink override
+- **Python httpx removal** -- removed incorrect `pip uninstall httpx` from Dockerfile that would have broken MCP server SSE transport
+
+---
+
 ## [3.1.0] - 2026-03-25
 
 ### Added
