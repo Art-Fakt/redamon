@@ -658,7 +658,23 @@ def run_cve_lookup(
             # into individual product strings
             for product in split_server_header(server):
                 technologies.add(product)
-    
+
+    # Also extract technologies from banner grab (non-HTTP services like SSH, FTP, MySQL)
+    banner_data = recon_data.get("banner_grab", {})
+    for service_type, instances in banner_data.get("services_found", {}).items():
+        for instance in instances:
+            version_str = instance.get("version")
+            if version_str:
+                technologies.add(version_str)
+
+    # Also extract technologies from Nmap service version detection
+    nmap_data = recon_data.get("nmap_scan", {})
+    for svc in nmap_data.get("services_detected", []):
+        product = svc.get("product", "")
+        version = svc.get("version", "")
+        if product and version:
+            technologies.add(f"{product}/{version}")
+
     # Filter and deduplicate technologies to lookup
     tech_to_lookup = []
     seen_normalized = set()

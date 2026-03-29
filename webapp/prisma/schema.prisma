@@ -183,6 +183,14 @@ model Project {
   masscanRetries              Int      @default(1) @map("masscan_retries")
   masscanExcludeTargets       String   @default("") @map("masscan_exclude_targets")
 
+  // ========== NMAP SERVICE DETECTION & NSE VULN SCRIPTS ==========
+  nmapEnabled                 Boolean  @default(true) @map("nmap_enabled")
+  nmapVersionDetection        Boolean  @default(true) @map("nmap_version_detection")
+  nmapScriptScan              Boolean  @default(true) @map("nmap_script_scan")
+  nmapTimingTemplate          String   @default("T3") @map("nmap_timing_template")
+  nmapTimeout                 Int      @default(600) @map("nmap_timeout")
+  nmapHostTimeout             Int      @default(300) @map("nmap_host_timeout")
+
   // ========== HTTPX HTTP PROBING ==========
   httpxDockerImage            String   @default("projectdiscovery/httpx:latest") @map("httpx_docker_image")
   httpxThreads                Int      @default(50) @map("httpx_threads")

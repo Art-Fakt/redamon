@@ -444,6 +444,48 @@ def merge_port_scan_results(combined_result: dict) -> None:
     }
 
 
+def merge_nmap_into_port_scan(combined_result: dict) -> None:
+    """
+    Merge Nmap service version data into port_scan.port_details.
+
+    Enriches existing port_details entries (from Naabu/Masscan) with Nmap's
+    product, version, CPE, and NSE script results. Does NOT add new ports.
+    """
+    nmap_data = combined_result.get("nmap_scan", {})
+    port_scan = combined_result.get("port_scan", {})
+    if not nmap_data or not port_scan:
+        return
+
+    enriched_count = 0
+
+    for host, nmap_host in nmap_data.get("by_host", {}).items():
+        ps_host = port_scan.get("by_host", {}).get(host)
+        if not ps_host:
+            continue
+        for nmap_pd in nmap_host.get("port_details", []):
+            for ps_pd in ps_host.get("port_details", []):
+                if ps_pd.get("port") == nmap_pd.get("port"):
+                    if nmap_pd.get("product"):
+                        ps_pd["product"] = nmap_pd["product"]
+                    if nmap_pd.get("version"):
+                        ps_pd["version"] = nmap_pd["version"]
+                    if nmap_pd.get("cpe"):
+                        ps_pd["cpe"] = nmap_pd["cpe"]
+                    if nmap_pd.get("scripts"):
+                        ps_pd["scripts"] = nmap_pd["scripts"]
+                    enriched_count += 1
+                    break
+
+    # Update scan_metadata to include nmap
+    scanners = port_scan.get("scan_metadata", {}).get("scanners", [])
+    if "nmap" not in scanners:
+        scanners.append("nmap")
+        port_scan.get("scan_metadata", {})["scanners"] = scanners
+
+    if enriched_count:
+        print(f"[+][Nmap] Enriched {enriched_count} port(s) with service version data")
+
+
 def run_ip_recon(target_ips: list, settings: dict) -> dict:
     """
     Run IP-based reconnaissance: expand CIDRs, reverse DNS, IP WHOIS.
@@ -1083,6 +1125,29 @@ def run_domain_recon(target: str, anonymous: bool = False, bruteforce: bool = Fa
 
         if "port_scan" in combined_result:
             _graph_update_bg("update_graph_from_port_scan", combined_result, USER_ID, PROJECT_ID)
+
+    # =====================================================================
+    # GROUP 3.5 — Nmap Service Version Detection + NSE Vulnerability Scripts
+    # Depends on: merged port_scan data (needs discovered open ports)
+    # Runs sequentially AFTER port scan merge, BEFORE HTTP probe
+    # =====================================================================
+    nmap_enabled = _settings.get('NMAP_ENABLED', True)
+    if nmap_enabled and "port_scan" in combined_result:
+        print(f"\n[*][Pipeline] GROUP 3.5: Nmap Service Detection + NSE Vuln Scripts")
+        print("-" * 40)
+
+        from recon.nmap_scan import run_nmap_scan
+        combined_result = run_nmap_scan(combined_result, output_file=output_file, settings=_settings)
+        combined_result["metadata"]["modules_executed"].append("nmap_scan")
+
+        # Merge Nmap service versions into port_scan.port_details
+        if "nmap_scan" in combined_result:
+            merge_nmap_into_port_scan(combined_result)
+
+        save_recon_file(combined_result, output_file)
+
+        if "nmap_scan" in combined_result:
+            _graph_update_bg("update_graph_from_nmap", combined_result, USER_ID, PROJECT_ID)
 
     # =====================================================================
     # GROUP 3b — OSINT Enrichment (parallel, passive — no packets to target)

@@ -61,8 +61,16 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'NAABU_VERIFY_PORTS': True,
     'NAABU_PASSIVE_MODE': False,
 
-    # Masscan Port Scanner
-    'MASSCAN_ENABLED': True,
+    # Nmap Service Detection & NSE Vuln Scripts
+    'NMAP_ENABLED': True,
+    'NMAP_VERSION_DETECTION': True,
+    'NMAP_SCRIPT_SCAN': True,
+    'NMAP_TIMING_TEMPLATE': 'T3',
+    'NMAP_TIMEOUT': 600,
+    'NMAP_HOST_TIMEOUT': 300,
+
+    # Masscan Port Scanner (disabled by default -- only useful for large IP ranges/CIDRs)
+    'MASSCAN_ENABLED': False,
     'MASSCAN_TOP_PORTS': '1000',
     'MASSCAN_CUSTOM_PORTS': '',
     'MASSCAN_RATE': 1000,
@@ -546,6 +554,14 @@ def fetch_project_settings(project_id: str, webapp_url: str) -> dict[str, Any]:
     settings['MASSCAN_WAIT'] = project.get('masscanWait', DEFAULT_SETTINGS['MASSCAN_WAIT'])
     settings['MASSCAN_RETRIES'] = project.get('masscanRetries', DEFAULT_SETTINGS['MASSCAN_RETRIES'])
     settings['MASSCAN_EXCLUDE_TARGETS'] = project.get('masscanExcludeTargets', DEFAULT_SETTINGS['MASSCAN_EXCLUDE_TARGETS'])
+
+    # Nmap Service Detection & NSE Vuln Scripts
+    settings['NMAP_ENABLED'] = project.get('nmapEnabled', DEFAULT_SETTINGS['NMAP_ENABLED'])
+    settings['NMAP_VERSION_DETECTION'] = project.get('nmapVersionDetection', DEFAULT_SETTINGS['NMAP_VERSION_DETECTION'])
+    settings['NMAP_SCRIPT_SCAN'] = project.get('nmapScriptScan', DEFAULT_SETTINGS['NMAP_SCRIPT_SCAN'])
+    settings['NMAP_TIMING_TEMPLATE'] = project.get('nmapTimingTemplate', DEFAULT_SETTINGS['NMAP_TIMING_TEMPLATE'])
+    settings['NMAP_TIMEOUT'] = project.get('nmapTimeout', DEFAULT_SETTINGS['NMAP_TIMEOUT'])
+    settings['NMAP_HOST_TIMEOUT'] = project.get('nmapHostTimeout', DEFAULT_SETTINGS['NMAP_HOST_TIMEOUT'])
 
     # httpx HTTP Probing
     settings['HTTPX_DOCKER_IMAGE'] = project.get('httpxDockerImage', DEFAULT_SETTINGS['HTTPX_DOCKER_IMAGE'])
@@ -1103,6 +1119,10 @@ def apply_stealth_overrides(settings: dict[str, Any]) -> dict[str, Any]:
     settings['SECURITY_CHECK_SMTP_OPEN_RELAY'] = False
     settings['SECURITY_CHECK_NO_RATE_LIMITING'] = False
     # Passive checks remain enabled (SPF, DMARC, DNSSEC, TLS expiry, headers)
+
+    # --- Nmap: reduce aggressiveness ---
+    settings['NMAP_TIMING_TEMPLATE'] = 'T2'
+    settings['NMAP_SCRIPT_SCAN'] = False
 
     # --- Masscan: DISABLED (active SYN scanning) ---
     settings['MASSCAN_ENABLED'] = False

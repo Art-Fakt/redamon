@@ -13,6 +13,7 @@ import { TargetSection } from './sections/TargetSection'
 import { ScanModulesSection } from './sections/ScanModulesSection'
 import { NaabuSection } from './sections/NaabuSection'
 import { MasscanSection } from './sections/MasscanSection'
+import { NmapSection } from './sections/NmapSection'
 import { HttpxSection } from './sections/HttpxSection'
 import { NucleiSection } from './sections/NucleiSection'
 import { KatanaSection } from './sections/KatanaSection'
@@ -437,8 +438,9 @@ export function ProjectForm({
                 <span>Both port scanners are disabled. The recon pipeline will skip port scanning entirely &mdash; downstream modules (HTTP probe, vulnerability scanning) require open ports to function and will produce no results.</span>
               </div>
             )}
-            <MasscanSection data={formData} updateField={updateField} />
             <NaabuSection data={formData} updateField={updateField} />
+            <NmapSection data={formData} updateField={updateField} />
+            <MasscanSection data={formData} updateField={updateField} />
           </>
         )}
 

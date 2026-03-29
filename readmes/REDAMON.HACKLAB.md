@@ -60,6 +60,10 @@
 | CORS Misconfiguration | 1 | Global wildcard with credentials |
 | Info Disclosure | 2 | `/api/v1/info` (env vars + JWT secret), GraphQL introspection |
 | Privilege Escalation | 1 | `/api/v2/users/profile/import/xml` (mass assignment) |
+| Log Injection | 1 | `/api/v2/login` username field |
+| Rate Limit Bypass | 1 | X-Forwarded-For spoofing on login |
+| GraphQL Abuse | 3 | Introspection, batching, password hash exposure |
+| Unrestricted File Upload | 1 | `/api/upload` |
 
 ### CVE-Based (CVE Lab)
 
@@ -68,10 +72,6 @@
 | CVE-2017-12617 | 8.1 | Tomcat 8.5.19 :8080 | PUT method RCE | Upload JSP shell via HTTP PUT |
 | CVE-2021-44228 | 10.0 | Log4j 2.14.1 :8888 | JNDI injection RCE | Remote code execution via HTTP headers |
 | CVE-2011-2523 | 10.0 | vsftpd 2.3.4 :21 | Backdoor | Root shell on port 6200 |
-| Log Injection | 1 | `/api/v2/login` username field |
-| Rate Limit Bypass | 1 | X-Forwarded-For spoofing on login |
-| GraphQL Abuse | 3 | Introspection, batching, password hash exposure |
-| Unrestricted File Upload | 1 | `/api/upload` |
 
 ---
 

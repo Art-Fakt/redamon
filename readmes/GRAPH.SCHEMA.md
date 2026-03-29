@@ -329,8 +329,14 @@ Open ports discovered on IPs/hosts.
     number: 80,                             // Port number
     protocol: "tcp",                        // tcp or udp
     state: "open",
-    source: "naabu"                         // Discovery source: "naabu", "masscan", "shodan",
+    source: "naabu",                        // Discovery source: "naabu", "masscan", "shodan",
                                             // "censys", "fofa", "netlas", "zoomeye", "criminalip"
+
+    // Nmap service version enrichment (set by update_graph_from_nmap)
+    product: "nginx",                       // Product name from Nmap -sV
+    version: "1.19.0",                      // Version from Nmap -sV
+    cpe: "cpe:/a:f5:nginx:1.19.0",         // CPE string from Nmap
+    nmap_scanned: true,                     // Flag: Nmap has probed this port
 })
 ```
 
@@ -350,8 +356,9 @@ Services running on ports.
 ```cypher
 (:Service {
     name: "http",                           // Service name
-    product: "nginx",                       // Product name (if detected) — set by ZoomEye (portinfo.product), Nmap, Netlas
-    version: "1.19.0",                      // Version (if detected) — set by ZoomEye (portinfo.version), Nmap, Netlas
+    product: "nginx",                       // Product name (if detected) — set by Nmap -sV, ZoomEye, Netlas
+    version: "1.19.0",                      // Version (if detected) — set by Nmap -sV, ZoomEye, Netlas
+    cpe: "cpe:/a:f5:nginx:1.19.0",         // CPE string — set by Nmap -sV
     banner: "nginx/1.19.0",                 // Raw banner (set by Censys, ZoomEye, Nmap, Netlas)
     extra_info: "Ubuntu",
     source: "censys",                       // Discovery source: "nmap", "censys", "fofa", "netlas", "zoomeye", "criminalip"
@@ -561,7 +568,7 @@ FOR (t:Technology) REQUIRE (t.name, t.version, t.user_id, t.project_id) IS UNIQU
 ---
 
 ### 10. Vulnerability
-Discovered vulnerabilities. Four sources produce Vulnerability nodes, each with different property sets.
+Discovered vulnerabilities. Five sources produce Vulnerability nodes, each with different property sets.
 
 **Common properties (all sources):**
 ```cypher
@@ -569,7 +576,7 @@ Discovered vulnerabilities. Four sources produce Vulnerability nodes, each with 
     id: String,                              // Unique identifier
     user_id: String,                         // Multi-tenant isolation
     project_id: String,                      // Multi-tenant isolation
-    source: "nuclei" | "gvm" | "security_check" | "netlas",  // Scanner source
+    source: "nuclei" | "gvm" | "security_check" | "netlas" | "nmap_nse",  // Scanner source
     name: String,                            // Vulnerability name
     description: String,                     // Description
     severity: "critical" | "high" | "medium" | "low" | "info",  // Always lowercase
@@ -687,6 +694,21 @@ Discovered vulnerabilities. Four sources produce Vulnerability nodes, each with 
     severity: "critical",
     cvss_score: 10.0,
     has_exploit: true,               // Known public exploit exists (from Netlas NVD data)
+})
+```
+
+**Nmap NSE-specific properties (source = "nmap_nse"):**
+```cypher
+(:Vulnerability {
+    // Example -- NSE script vulnerability detection
+    id: "nmap-nse-ftp-vsftpd-backdoor-21-192.168.1.10",
+    source: "nmap_nse",
+    name: "ftp-vsftpd-backdoor",               // NSE script ID
+    severity: "critical",                       // Mapped from NSE state (VULNERABLE = critical)
+    type: "nmap_nse",                           // Vulnerability type
+    state: "VULNERABLE",                        // NSE script state (VULNERABLE, NOT VULNERABLE, etc.)
+    output: "vsFTPd version 2.3.4 backdoor...", // Full NSE script output
+    cve_id: "CVE-2011-2523",                    // CVE extracted from NSE output (regex CVE-\d{4}-\d+)
 })
 ```
 
@@ -1279,11 +1301,33 @@ RETURN s.name, ip.address, v.name, v.severity
 ### Technology Relationships
 
 ```cypher
-// Technology has known CVEs
+// Technology has known CVEs (from CVE lookup via NVD, or from Nmap NSE scripts)
 (Technology)-[:HAS_KNOWN_CVE]->(CVE)
 
-// Technology runs on service
+// Technology runs on service (httpx detection via BaseURL)
 (Service)-[:POWERED_BY]->(Technology)
+
+// Service uses technology (Nmap -sV detection, e.g. Service:ftp:21 -> Technology:vsftpd/2.3.4)
+(Service)-[:USES_TECHNOLOGY]->(Technology)
+
+// Port has technology (Nmap -sV detection, e.g. Port:21/tcp -> Technology:vsftpd/2.3.4)
+(Port)-[:HAS_TECHNOLOGY]->(Technology)
+
+// NSE vulnerability found on technology (e.g. ftp-vsftpd-backdoor -> vsftpd/2.3.4)
+(Vulnerability)-[:FOUND_ON]->(Technology)
+
+// NSE vulnerability affects port (e.g. ftp-vsftpd-backdoor -> Port:21/tcp)
+(Vulnerability)-[:AFFECTS]->(Port)
+
+// NSE vulnerability has CVE (e.g. ftp-vsftpd-backdoor -> CVE-2011-2523)
+(Vulnerability)-[:HAS_CVE]->(CVE)
+```
+
+**Nmap attack chain traversal** -- find all exploitable services in one query:
+```cypher
+MATCH (svc:Service)-[:USES_TECHNOLOGY]->(t:Technology)-[:HAS_KNOWN_CVE]->(c:CVE)
+WHERE svc.project_id = $projectId
+RETURN svc.name, svc.port_number, t.name, c.id
 ```
 
 ---
@@ -1807,6 +1851,11 @@ FOR (s:Secret) ON (s.source);
 | `resource_enum.forms[]` | Endpoint (update) | is_form, form_enctype, form_found_at_pages, form_input_names, form_count |
 | `vuln_scan.by_target.<host>.findings[]` | Vulnerability | template_id, severity, matched_at, fuzzing_*, raw_request, raw_response, matched_ip, matcher_status, max_requests |
 | `vuln_scan.by_target.<host>.findings[].raw.*` | Vulnerability | curl_command, extracted_results, extractor_name, authors (from raw.info.author) |
+| `nmap_scan.services_detected[]` | Technology | name (product/version), version, cpe, source='nmap' |
+| `nmap_scan.by_host.<host>.port_details[]` | Port (enriched) | product, version, cpe, nmap_scanned=true |
+| `nmap_scan.by_host.<host>.port_details[]` | Service (enriched) | product, version, cpe |
+| `nmap_scan.nse_vulns[]` | Vulnerability | name (script_id), severity, type='nmap_nse', output, state, cve_id |
+| `nmap_scan.nse_vulns[].cve` | CVE | id, source='nmap_nse' |
 | `technology_cves.by_technology.<tech>.*` | Technology | product, version, cve_count, critical_cve_count, high_cve_count |
 | `technology_cves.by_technology.<tech>.cves[]` | CVE | id, cvss, severity, description, published, source, url, references |
 | `technology_cves.by_technology.<tech>.cves[].mitre_attack.cwe_hierarchy` | MitreData | cwe_id, cwe_name, cwe_description, abstraction, is_leaf |
@@ -1828,6 +1877,12 @@ FOR (s:Secret) ON (s.source);
 | `vuln_scan.discovered_urls.dast_urls_with_params[]` | HAS_PARAMETER | Endpoint → Parameter |
 | `vuln_scan.by_target.<host>.findings[]` | FOUND_AT | Vulnerability → Endpoint |
 | `vuln_scan.by_target.<host>.findings[].raw.fuzzing_parameter` | AFFECTS_PARAMETER | Vulnerability → Parameter |
+| `nmap_scan.services_detected[]` | USES_TECHNOLOGY | Service → Technology |
+| `nmap_scan.services_detected[]` | HAS_TECHNOLOGY | Port → Technology |
+| `nmap_scan.nse_vulns[]` | AFFECTS | Vulnerability → Port |
+| `nmap_scan.nse_vulns[]` | FOUND_ON | Vulnerability → Technology |
+| `nmap_scan.nse_vulns[].cve` | HAS_CVE | Vulnerability → CVE |
+| `nmap_scan.nse_vulns[].cve` (+ services_detected match) | HAS_KNOWN_CVE | Technology → CVE |
 | `technology_cves.by_technology.<tech>.cves[]` | HAS_KNOWN_CVE | Technology → CVE |
 | `technology_cves.by_technology.<tech>.cves[].mitre_attack.cwe_hierarchy` | HAS_CWE | CVE → MitreData |
 | `technology_cves.by_technology.<tech>.cves[].mitre_attack.cwe_hierarchy.*.related_capec[]` | HAS_CAPEC | MitreData → Capec |

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.1.4] - 2026-03-29
+
+### Added
+
+- **Nmap Service Detection & NSE Vulnerability Scripts** -- deep service version detection (`-sV`) and NSE vulnerability scripts (`--script vuln`) integrated into the recon pipeline as GROUP 3.5, running after port discovery and before HTTP probing. Only scans ports already discovered as open by Masscan/Naabu. Full multi-layer integration:
+  - **Backend**: `recon/nmap_scan.py` module with `run_nmap_scan()` orchestration, XML output parsing, CVE extraction from NSE script output (regex `CVE-\d{4}-\d+`), and thread-safe `run_nmap_scan_isolated()` wrapper
+  - **Pipeline**: runs after port_scan merge, enriches `port_scan.port_details` with product/version/CPE/scripts via `merge_nmap_into_port_scan()`, updates `port_scan.scan_metadata.scanners` to include "nmap"
+  - **Neo4j graph**: `update_graph_from_nmap()` enriches Port nodes (product, version, CPE, nmap_scanned flag), creates Technology nodes (`(Service)-[:USES_TECHNOLOGY]->(Technology)`, `(Port)-[:HAS_TECHNOLOGY]->(Technology)`), creates Vulnerability nodes from NSE findings (`(Vulnerability)-[:AFFECTS]->(Port)`, `(Vulnerability)-[:FOUND_ON]->(Technology)`), and creates CVE nodes from NSE-detected CVEs (`(Vulnerability)-[:HAS_CVE]->(CVE)`, `(Technology)-[:HAS_KNOWN_CVE]->(CVE)`)
+  - **CVE lookup**: Nmap-detected service versions (product/version from `services_detected[]`) feed into the CVE lookup pipeline for NVD/Vulners enrichment
+  - **Docker**: nmap installed via `apt-get` in recon Dockerfile, NSE scripts included
+  - **Frontend**: `NmapSection.tsx` with enable/disable toggle, version detection (-sV) toggle, NSE vulnerability scripts toggle, timing template dropdown (T1-T5), total timeout, and per-host timeout settings
+  - **Prisma schema**: 6 new fields -- `nmapEnabled`, `nmapVersionDetection`, `nmapScriptScan`, `nmapTimingTemplate`, `nmapTimeout`, `nmapHostTimeout`
+  - **Settings**: 6 configurable parameters with stealth mode overrides (timing T2, scripts disabled)
+  - **Output structure**: `nmap_scan` key with `scan_metadata`, `by_host` (port details with service/version/CPE/scripts), `services_detected[]`, `nse_vulns[]`, and `summary`
+  - **Tests**: comprehensive test suite in `recon/tests/test_nmap_scan.py` covering target extraction, command construction, XML parsing, CVE extraction, and edge cases
+
+---
+
 ## [3.1.3] - 2026-03-29
 
 ### Fixed

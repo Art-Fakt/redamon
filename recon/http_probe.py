@@ -160,11 +160,14 @@ SERVICE_PATTERNS = [
     (r"\* OK", "imap", lambda m: "IMAP"),
     
     # Databases
+    (r"(\d+\.\d+\.\d+).*?mysql", "mysql", lambda m: f"MySQL/{m.group(1)}"),
+    (r"(\d+\.\d+\.\d+)-MariaDB", "mysql", lambda m: f"MariaDB/{m.group(1)}"),
     (r"mysql|MariaDB", "mysql", lambda m: "MySQL/MariaDB"),
     (r"PostgreSQL", "postgresql", lambda m: "PostgreSQL"),
     (r"redis_version:([\d.]+)", "redis", lambda m: f"Redis {m.group(1)}"),
     (r"-ERR.*Redis", "redis", lambda m: "Redis"),
-    
+    (r"MongoDB|mongod|It looks like you are trying to access MongoDB", "mongodb", lambda m: "MongoDB"),
+
     # VNC
     (r"RFB\s*([\d.]+)", "vnc", lambda m: f"VNC (RFB {m.group(1)})"),
     
@@ -210,7 +213,7 @@ def grab_banner(host: str, port: int, timeout: float = 5.0, use_ssl: bool = Fals
 
         # First try to receive (many services send banner immediately)
         try:
-            sock.settimeout(2.0)
+            sock.settimeout(3.0)
             banner = sock.recv(1024)
         except socket.timeout:
             pass

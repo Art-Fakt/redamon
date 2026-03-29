@@ -981,10 +981,16 @@ Each node has `user_id` and `project_id` properties for tenant isolation (handle
 - protocol (string): "tcp", "udp"
 - state (string): "open", "closed", "filtered"
 - source (string): which tool discovered it ("naabu", "masscan", "shodan", "censys", "fofa", "netlas", "zoomeye", "criminalip")
+- product (string): software product from Nmap -sV (e.g. "vsftpd", "Apache Tomcat", "MySQL")
+- version (string): software version from Nmap -sV (e.g. "2.3.4", "8.5.19")
+- cpe (string): CPE string from Nmap (e.g. "cpe:/a:vsftpd:vsftpd:2.3.4")
+- nmap_scanned (boolean): true if Nmap has probed this port
 
 **Service** - Services running on ports
 - name (string): "http", "ssh", "mysql"
+- product (string): software product from Nmap -sV or OSINT (e.g. "vsftpd", "OpenSSH", "nginx")
 - version (string): service version
+- cpe (string): CPE string from Nmap
 - banner (string): raw banner
 - source (string): which tool detected it
 - extended_service_name (string): more specific label from Censys (e.g. "HTTPS")
@@ -1019,10 +1025,12 @@ Each node has `user_id` and `project_id` properties for tenant isolation (handle
 
 ### Technology & Security Nodes
 
-**Technology** - Detected technologies (web servers, frameworks, CMS)
-- name (string): "nginx", "WordPress", "jQuery"
+**Technology** - Detected technologies (web servers, frameworks, CMS, services)
+- name (string): "nginx", "WordPress", "jQuery", "vsftpd/2.3.4", "Apache Tomcat/8.5.19"
 - version (string): version if detected
 - category (string): "web-server", "cms", "javascript-framework"
+- source (string): "nmap" for Nmap-detected, null for httpx-detected
+- cpe (string): CPE string from Nmap (e.g. "cpe:/a:apache:tomcat:8.5.19")
 
 **Header** - HTTP response headers
 - name (string): "X-Frame-Options", "Content-Security-Policy"
@@ -1291,9 +1299,11 @@ GVM-specific properties (source="gvm"):
 
 ### Technology Relationships
 - `(b:BaseURL)-[:USES_TECHNOLOGY]->(t:Technology)` - BaseURL uses Technology (from httpx/wappalyzer)
+- `(svc:Service)-[:USES_TECHNOLOGY]->(t:Technology)` - Service uses Technology (from Nmap -sV, e.g. ftp service -> vsftpd/2.3.4)
+- `(p:Port)-[:HAS_TECHNOLOGY]->(t:Technology)` - Port has Technology (from Nmap -sV)
 - `(p:Port)-[:USES_TECHNOLOGY]->(t:Technology)` - Port uses Technology (from GVM detection)
 - `(i:IP)-[:USES_TECHNOLOGY]->(t:Technology)` - IP uses Technology (OS-level tech from GVM, no port)
-- `(t:Technology)-[:HAS_KNOWN_CVE]->(c:CVE)` - Technology has known CVE
+- `(t:Technology)-[:HAS_KNOWN_CVE]->(c:CVE)` - Technology has known CVE (from NVD lookup or Nmap NSE)
 
 ### Security Relationships
 - `(b:BaseURL)-[:HAS_HEADER]->(h:Header)` - BaseURL has Header
@@ -1306,6 +1316,11 @@ GVM-specific properties (source="gvm"):
 **DAST/Web Vulnerabilities (source="nuclei"):**
 - `(v:Vulnerability)-[:FOUND_AT]->(e:Endpoint)` - Vuln found at web endpoint
 - `(v:Vulnerability)-[:AFFECTS_PARAMETER]->(param:Parameter)` - Vuln affects parameter
+
+**Nmap NSE Vulnerabilities (source="nmap_nse"):**
+- `(v:Vulnerability)-[:AFFECTS]->(p:Port)` - NSE vuln affects port (e.g. ftp-vsftpd-backdoor -> Port:21)
+- `(v:Vulnerability)-[:FOUND_ON]->(t:Technology)` - NSE vuln found on technology (e.g. ftp-vsftpd-backdoor -> vsftpd/2.3.4)
+- `(v:Vulnerability)-[:HAS_CVE]->(c:CVE)` - NSE vuln has specific CVE (e.g. -> CVE-2011-2523)
 
 **Network/GVM Vulnerabilities (source="gvm" or "security_check"):**
 - `(i:IP)-[:HAS_VULNERABILITY]->(v:Vulnerability)` - IP has network vuln
@@ -1445,6 +1460,27 @@ MATCH (s)-[:RESOLVES_TO]->(i:IP)
 MATCH (i)-[:HAS_PORT]->(p:Port)
 WHERE p.state = "open"
 RETURN s.name, i.address, p.number, p.protocol
+```
+
+### Nmap Service Detection & NSE Vulnerabilities
+```cypher
+// All services detected by Nmap with versions
+MATCH (p:Port)
+WHERE p.nmap_scanned = true AND p.product IS NOT NULL
+RETURN p.number, p.product, p.version, p.cpe
+
+// Nmap NSE vulnerabilities with CVEs
+MATCH (v:Vulnerability {{source: "nmap_nse"}})-[:HAS_CVE]->(c:CVE)
+RETURN v.name, v.port_number, c.id, v.state
+
+// Full Nmap attack chain: Service -> Technology -> CVE
+MATCH (svc:Service)-[:USES_TECHNOLOGY]->(t:Technology)-[:HAS_KNOWN_CVE]->(c:CVE)
+RETURN svc.name, svc.port_number, t.name, c.id
+
+// NSE vulns with the technology they affect
+MATCH (v:Vulnerability {{source: "nmap_nse"}})-[:FOUND_ON]->(t:Technology)
+OPTIONAL MATCH (v)-[:HAS_CVE]->(c:CVE)
+RETURN v.name, t.name, c.id, v.severity
 ```
 
 ### Network Topology
@@ -1613,6 +1649,7 @@ RETURN s.name, collect(t.name) as technologies
 5. **Use property filters** in WHERE clauses, not relationship traversals for filtering
 6. **Check vulnerability source** when querying Vulnerability nodes:
    - source="nuclei" -> web/DAST vulnerabilities (FOUND_AT, AFFECTS_PARAMETER)
+   - source="nmap_nse" -> Nmap NSE script findings (AFFECTS Port, FOUND_ON Technology, HAS_CVE CVE)
    - source="gvm" -> network vulnerabilities (HAS_VULNERABILITY from IP/Subdomain)
    - source="security_check" -> DNS/email security checks (SPF, DMARC)
    - source="netlas" -> passive CVE detection via NVD (HAS_VULNERABILITY from Service)

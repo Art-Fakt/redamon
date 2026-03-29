@@ -79,6 +79,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     # Runtime dependency for masscan
     libpcap0.8 \
+    # Nmap for service version detection (-sV) and NSE vuln scripts (--script vuln)
+    nmap \
     # Clean up apt cache
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
