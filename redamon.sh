@@ -219,6 +219,9 @@ cmd_install() {
     echo -e "  ${CYAN}Webapp:${NC}  http://localhost:3000"
     echo -e "  ${CYAN}Status:${NC}  ./redamon.sh status"
     echo ""
+    echo -e "  ${YELLOW}If RedAmon is useful to you, a GitHub star helps others find the project:${NC}"
+    echo -e "  ${CYAN}https://github.com/samugit83/redamon${NC}"
+    echo ""
     if [[ "$gvm_mode" == "true" ]]; then
         warn "GVM/OpenVAS feed sync takes ~30 minutes on first run."
         echo -e "  ${CYAN}GVM credentials:${NC} admin / admin"
