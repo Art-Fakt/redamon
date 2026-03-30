@@ -2109,4 +2109,95 @@ class OsintMixin:
         print(f"[graph-db] update_graph_from_criminalip complete: {stats}")
         return stats
 
+    def update_graph_from_uncover(self, recon_data: dict, user_id: str, project_id: str) -> dict:
+        """Update Neo4j graph with uncover target expansion results.
 
+        Creates Subdomain and IP nodes for newly discovered assets.
+        Uses ON CREATE SET to avoid overwriting richer data from other tools.
+        """
+        stats = {
+            "subdomains_created": 0, "ips_created": 0,
+            "relationships_created": 0, "errors": [],
+        }
+        domain = recon_data.get("domain", "") or ""
+        try:
+            uncover = recon_data.get("uncover") or {}
+            hosts = uncover.get("hosts") or []
+            ips = uncover.get("ips") or []
+            ip_ports = uncover.get("ip_ports") or {}
+
+            if not hosts and not ips:
+                return stats
+
+            with self.driver.session() as session:
+                for hostname in hosts:
+                    if not hostname:
+                        continue
+                    try:
+                        session.run(
+                            """
+                            MERGE (s:Subdomain {name: $name, user_id: $user_id, project_id: $project_id})
+                            ON CREATE SET s.discovered_at = datetime(), s.updated_at = datetime(),
+                                          s.source = 'uncover', s.status = 'unverified'
+                            """,
+                            name=hostname, user_id=user_id, project_id=project_id,
+                        )
+                        stats["subdomains_created"] += 1
+                        if domain:
+                            session.run(
+                                """
+                                MATCH (s:Subdomain {name: $name, user_id: $user_id, project_id: $project_id})
+                                MATCH (d:Domain {name: $domain, user_id: $user_id, project_id: $project_id})
+                                MERGE (s)-[:BELONGS_TO]->(d)
+                                MERGE (d)-[:HAS_SUBDOMAIN]->(s)
+                                """,
+                                name=hostname, domain=domain,
+                                user_id=user_id, project_id=project_id,
+                            )
+                            stats["relationships_created"] += 2
+                    except Exception as e:
+                        stats["errors"].append(f"Uncover subdomain {hostname}: {e}")
+
+                for ip in ips:
+                    if not ip:
+                        continue
+                    try:
+                        session.run(
+                            """
+                            MERGE (i:IP {address: $address, user_id: $user_id, project_id: $project_id})
+                            ON CREATE SET i.updated_at = datetime(), i.uncover_discovered = true
+                            SET i.uncover_enriched = true, i.updated_at = datetime()
+                            """,
+                            address=ip, user_id=user_id, project_id=project_id,
+                        )
+                        stats["ips_created"] += 1
+
+                        ports = ip_ports.get(ip, [])
+                        for port_num in ports:
+                            if not port_num or port_num <= 0:
+                                continue
+                            session.run(
+                                """
+                                MERGE (p:Port {number: $port, protocol: 'tcp', ip_address: $ip,
+                                               user_id: $user_id, project_id: $project_id})
+                                ON CREATE SET p.state = 'open', p.source = 'uncover',
+                                              p.updated_at = datetime()
+                                MERGE (i:IP {address: $ip, user_id: $user_id, project_id: $project_id})
+                                MERGE (i)-[:HAS_PORT]->(p)
+                                """,
+                                port=int(port_num), ip=ip,
+                                user_id=user_id, project_id=project_id,
+                            )
+                            stats["relationships_created"] += 1
+                    except Exception as e:
+                        stats["errors"].append(f"Uncover IP {ip}: {e}")
+
+        except Exception as e:
+            stats["errors"].append(f"update_graph_from_uncover: {e}")
+
+        print(f"[+][graph-db] Uncover Graph Update: "
+              f"{stats['subdomains_created']} subdomains, "
+              f"{stats['ips_created']} IPs, "
+              f"{stats['relationships_created']} relationships")
+        print(f"[graph-db] update_graph_from_uncover complete")
+        return stats

@@ -35,6 +35,7 @@ from tools import (
     VirusTotalToolManager,
     ZoomEyeToolManager,
     CriminalIpToolManager,
+    UncoverToolManager,
     PhaseAwareToolExecutor,
 )
 from orchestrator_helpers import (
@@ -219,13 +220,14 @@ class AgentOrchestrator:
         # OSINT tools — Censys, FOFA, OTX, Netlas, VirusTotal, ZoomEye, CriminalIP
         if hasattr(self, '_osint_managers') and self.tool_executor:
             _osint_key_map = {
-                'censys': {'id_field': 'censysApiId', 'secret_field': 'censysApiSecret'},
+                'censys': {'token_field': 'censysApiToken', 'org_field': 'censysOrgId'},
                 'fofa': {'key_field': 'fofaApiKey', 'rotation_name': 'fofa'},
                 'otx': {'key_field': 'otxApiKey', 'rotation_name': 'otx'},
                 'netlas': {'key_field': 'netlasApiKey', 'rotation_name': 'netlas'},
                 'virustotal': {'key_field': 'virusTotalApiKey', 'rotation_name': 'virustotal'},
                 'zoomeye': {'key_field': 'zoomEyeApiKey', 'rotation_name': 'zoomeye'},
                 'criminalip': {'key_field': 'criminalIpApiKey', 'rotation_name': 'criminalip'},
+                'uncover': {'key_field': None},
             }
             for tool_name, key_cfg in _osint_key_map.items():
                 mgr = self._osint_managers.get(tool_name)
@@ -235,12 +237,14 @@ class AgentOrchestrator:
                 if not enabled:
                     self.tool_executor.update_osint_tool(tool_name, None)
                     continue
-                if tool_name == 'censys':
-                    api_id = user_settings.get(key_cfg['id_field'], '')
-                    api_secret = user_settings.get(key_cfg['secret_field'], '')
-                    if api_id and api_secret and (mgr.api_id != api_id or mgr.api_secret != api_secret):
-                        mgr.api_id = api_id
-                        mgr.api_secret = api_secret
+                if tool_name == 'uncover':
+                    self.tool_executor.update_osint_tool(tool_name, mgr.get_tool())
+                elif tool_name == 'censys':
+                    api_token = user_settings.get(key_cfg['token_field'], '')
+                    org_id = user_settings.get(key_cfg['org_field'], '')
+                    if api_token and org_id and (mgr.api_token != api_token or mgr.org_id != org_id):
+                        mgr.api_token = api_token
+                        mgr.org_id = org_id
                         self.tool_executor.update_osint_tool(tool_name, mgr.get_tool())
                         logger.info(f"Updated {tool_name} tool with API credentials")
                 else:
@@ -321,6 +325,7 @@ class AgentOrchestrator:
             'virustotal': VirusTotalToolManager(),
             'zoomeye': ZoomEyeToolManager(),
             'criminalip': CriminalIpToolManager(),
+            'uncover': UncoverToolManager(),
         }
         osint_tools = {
             name: mgr.get_tool()

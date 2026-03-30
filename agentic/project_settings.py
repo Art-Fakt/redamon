@@ -100,6 +100,7 @@ DEFAULT_AGENT_SETTINGS: dict[str, Any] = {
         'virustotal': ['informational', 'exploitation'],
         'zoomeye': ['informational', 'exploitation'],
         'criminalip': ['informational', 'exploitation'],
+        'uncover': ['informational', 'exploitation'],
     },
 
     # Kali Shell Library Installation
@@ -128,6 +129,7 @@ DEFAULT_AGENT_SETTINGS: dict[str, Any] = {
     'VIRUSTOTAL_ENABLED': True,
     'ZOOMEYE_ENABLED': True,
     'CRIMINALIP_ENABLED': True,
+    'UNCOVER_ENABLED': True,
 
     # Social Engineering Simulation
     'PHISHING_SMTP_CONFIG': '',  # Free-text SMTP config for phishing email delivery (optional)

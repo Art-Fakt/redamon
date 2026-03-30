@@ -175,8 +175,8 @@ async def get_defaults():
             # API keys fetched at runtime from user's global settings (not stored per-project)
             'SHODAN_API_KEY',
             'URLSCAN_API_KEY',
-            'CENSYS_API_ID',
-            'CENSYS_API_SECRET',
+            'CENSYS_API_TOKEN',
+            'CENSYS_ORG_ID',
             'OTX_API_KEY',
             'NETLAS_API_KEY',
             'VIRUSTOTAL_API_KEY',

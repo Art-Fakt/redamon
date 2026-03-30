@@ -1008,16 +1008,16 @@ def _osint_http_error(tool_name: str, e: 'httpx.HTTPStatusError') -> str:
 
 
 class CensysToolManager:
-    """Censys internet search — host/service discovery via certificate and banner data."""
+    """Censys internet search — host/service discovery via Platform API v3."""
 
-    API_BASE = "https://search.censys.io/api/v2"
+    API_BASE = "https://api.platform.censys.io/v3/global"
 
-    def __init__(self, api_id: str = '', api_secret: str = ''):
-        self.api_id = api_id
-        self.api_secret = api_secret
+    def __init__(self, api_token: str = '', org_id: str = ''):
+        self.api_token = api_token
+        self.org_id = org_id
 
     def get_tool(self) -> Optional[callable]:
-        if not self.api_id or not self.api_secret:
+        if not self.api_token or not self.org_id:
             logger.warning("Censys API credentials not configured - censys tool unavailable.")
             return None
         manager = self
@@ -1039,20 +1039,25 @@ class CensysToolManager:
             Returns:
                 Formatted results from the Censys API
             """
-            auth = (manager.api_id, manager.api_secret)
+            headers = {
+                "Authorization": f"Bearer {manager.api_token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+            params = {"organization_id": manager.org_id}
             try:
-                async with httpx.AsyncClient(timeout=30.0, auth=auth) as client:
+                async with httpx.AsyncClient(timeout=30.0, headers=headers, params=params) as client:
                     if action == "search":
                         if not query:
                             return "Error: 'query' required for action='search'"
-                        resp = await client.get(
-                            f"{manager.API_BASE}/hosts/search",
-                            params={"q": query, "per_page": 25},
+                        resp = await client.post(
+                            f"{manager.API_BASE}/search/query",
+                            json={"query": query, "page_size": 25},
                         )
                     elif action == "host":
                         if not ip:
                             return "Error: 'ip' required for action='host'"
-                        resp = await client.get(f"{manager.API_BASE}/hosts/{ip}")
+                        resp = await client.get(f"{manager.API_BASE}/asset/host/{ip}")
                     else:
                         return f"Error: Unknown action '{action}'. Valid: search, host"
 
@@ -1060,11 +1065,12 @@ class CensysToolManager:
                     data = resp.json()
 
                 if action == "search":
-                    hits = data.get("result", {}).get("hits", [])
-                    total = data.get("result", {}).get("total", 0)
+                    result = data.get("result", {})
+                    hits = result.get("hits", [])
+                    total = result.get("total", 0)
                     if not hits:
                         return f"No Censys results for: {query}"
-                    lines = [f"Censys search: {total} hosts (showing {len(hits)})"]
+                    lines = [f"Censys search: {total} hits (showing {len(hits)})"]
                     for i, h in enumerate(hits[:25], 1):
                         ip_addr = h.get("ip", "?")
                         services = h.get("services", [])
@@ -1748,13 +1754,97 @@ class CriminalIpToolManager:
                 return "\n".join(lines)
 
             except httpx.HTTPStatusError as e:
-                return _osint_http_error("Criminal IP", e)
+                status = e.response.status_code
+                if status in (401, 403):
+                    return "Criminal IP API error: API key is invalid or expired. Check Global Settings."
+                if status == 402:
+                    return "Criminal IP API error: Credit/quota exhausted. Check your plan."
+                body = e.response.text[:300].lower()
+                if any(kw in body for kw in ("credit", "quota", "exceeded", "insufficient")):
+                    return "Criminal IP API error: Credit/quota exhausted. Check your plan."
+                if status == 429:
+                    return "Criminal IP API error: Rate limit exceeded. Try again later."
+                return f"Criminal IP API error: HTTP {status}"
             except Exception as e:
                 logger.error(f"Criminal IP {action} failed: {e}")
                 return f"Criminal IP error: {str(e)}"
 
         logger.info("Criminal IP threat intelligence tool configured (2 actions)")
         return criminalip
+
+
+class UncoverToolManager:
+    """ProjectDiscovery Uncover — multi-engine internet search."""
+
+    def __init__(self, api_key: str = ''):
+        self.api_key = api_key
+        self.key_rotator = None
+
+    def get_tool(self) -> Optional[callable]:
+        manager = self
+
+        @tool
+        async def uncover(action: str, query: str = '', ip: str = '') -> str:
+            """
+            Uncover multi-engine internet search for exposed assets.
+
+            Searches across Shodan, Censys, FOFA, ZoomEye, Netlas, CriminalIP,
+            and other engines simultaneously.
+
+            Args:
+                action: "search" to search by query, "ip" to lookup a specific IP
+                query: Search query (e.g. 'ssl:"Example Inc."', 'hostname:example.com')
+                ip: IP address for IP-specific lookup
+
+            Returns:
+                Discovered hosts with IP, port, and source engine
+            """
+            if action == "ip" and ip:
+                query = ip
+            elif action == "search" and not query:
+                return "Error: 'query' is required for search action"
+            elif not query:
+                return "Error: provide action='search' with query, or action='ip' with ip"
+
+            try:
+                import subprocess
+                import json as _json
+                cmd = ["docker", "run", "--rm",
+                       "projectdiscovery/uncover:latest",
+                       "-q", query, "-json", "-silent", "-l", "25"]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                if result.returncode != 0:
+                    return f"Uncover error: {result.stderr[:200]}"
+
+                lines = []
+                for line in result.stdout.strip().split('\n'):
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = _json.loads(line)
+                        ip_val = entry.get('ip', '')
+                        port_val = entry.get('port', '')
+                        host_val = entry.get('host', '')
+                        source = entry.get('source', '')
+                        parts = [f"{ip_val}:{port_val}"]
+                        if host_val and host_val != ip_val:
+                            parts.append(f"host={host_val}")
+                        if source:
+                            parts.append(f"[{source}]")
+                        lines.append(" ".join(parts))
+                    except _json.JSONDecodeError:
+                        continue
+
+                if not lines:
+                    return f"Uncover: no results for '{query}'"
+                return f"Uncover results ({len(lines)}):\n" + "\n".join(lines[:25])
+            except subprocess.TimeoutExpired:
+                return "Uncover: search timed out"
+            except Exception as e:
+                return f"Uncover error: {str(e)}"
+
+        logger.info("Uncover multi-engine search tool configured")
+        return uncover
 
 
 # =============================================================================

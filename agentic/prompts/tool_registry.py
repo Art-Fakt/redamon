@@ -193,7 +193,7 @@ TOOL_REGISTRY = {
             '**censys** (Internet-wide host/service search)\n'
             '   - **action="search"** — Search hosts by query (e.g. "services.port=443 AND location.country=US")\n'
             '   - **action="host"** — Detailed IP info: services, TLS certs, OS, ASN\n'
-            '   - Paid API — requires Censys API ID + Secret'
+            '   - Paid API — requires Censys API Token + Organization ID'
         ),
     },
     "fofa": {
@@ -256,6 +256,18 @@ TOOL_REGISTRY = {
             '**criminalip** (AI threat intelligence)\n'
             '   - **action="ip_report"** — Risk score, open ports, issues (VPN/proxy/Tor/hosting), vulnerabilities\n'
             '   - **action="domain_report"** — Risk assessment, technologies, domain intel'
+        ),
+    },
+    "uncover": {
+        "purpose": "Multi-engine internet search (Shodan, Censys, FOFA, ZoomEye, Netlas, etc.)",
+        "when_to_use": "Search multiple OSINT engines at once for exposed assets, or look up a specific IP across all engines",
+        "args_format": '"action": "search|ip", "query": "search query", "ip": "1.2.3.4"',
+        "description": (
+            '**uncover** (Multi-engine internet search)\n'
+            '   - **action="search"** — Search across all configured engines simultaneously\n'
+            '   - **action="ip"** — Lookup a specific IP across all engines\n'
+            '   - Supports: Shodan, Censys, FOFA, ZoomEye, Netlas, CriminalIP, Quake, Hunter, and more\n'
+            '   - Returns IP, port, hostname, and source engine for each result'
         ),
     },
 }
