@@ -2065,3 +2065,221 @@ td:hover .tableCellCopyButton {
   overflow-y: auto;
 }
 
+/* =============================================================================
+   SKILL PICKER
+   ============================================================================= */
+
+.inputWrapperOuter {
+  position: relative;
+}
+
+.skillPickerButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-all);
+  flex-shrink: 0;
+}
+
+.skillPickerButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.skillDropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  padding: var(--space-1) 0;
+}
+
+.skillDropdownEmpty {
+  padding: var(--space-3);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.skillCategoryLabel {
+  padding: var(--space-1-5) var(--space-3) var(--space-0-5);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.skillDropdownItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-3);
+  cursor: pointer;
+  transition: background-color 100ms ease;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.skillDropdownItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.skillDropdownItemActive {
+  background: rgba(229, 57, 53, 0.12);
+}
+
+.skillDropdownItemActive:hover {
+  background: rgba(229, 57, 53, 0.18);
+}
+
+.skillItemName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skillCategoryBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.skillDropdownHint {
+  padding: var(--space-1) var(--space-3);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.skillDropdownHint kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  font-family: inherit;
+  color: var(--text-secondary);
+}
+
+/* Active skill badge */
+.activeSkillBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 6px;
+  margin-bottom: 6px;
+  background: rgba(229, 57, 53, 0.1);
+  border: 1px solid rgba(229, 57, 53, 0.35);
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  color: #ef5350;
+  line-height: 1;
+  max-width: 100%;
+}
+
+.activeSkillBadgeName {
+  font-weight: var(--font-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activeSkillBadgeCategory {
+  font-size: 9px;
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border-default);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.activeSkillRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: rgba(229, 57, 53, 0.6);
+  cursor: pointer;
+  transition: var(--transition-all);
+  flex-shrink: 0;
+}
+
+.activeSkillRemove:hover {
+  background: rgba(229, 57, 53, 0.2);
+  color: #ef5350;
+}
+
+.skillDropdownActions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.skillDropdownActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  transition: var(--transition-all);
+  white-space: nowrap;
+}
+
+.skillDropdownActionBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.skillDropdownActionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

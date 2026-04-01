@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.3.0] - 2026-04-01
+
+### Added
+
+- **Chat Skills (`/skill` command)** -- on-demand reference injection system for the AI agent chat. Chat Skills are tactical reference docs (tool playbooks, vulnerability guides, framework notes) that you inject into the agent's context exactly when you need them, without affecting classification or phase routing:
+  - **`/skill` command**: type `/skill ssrf` to activate a skill, `/skill ssrf test the API` to activate and send a message in one shot, `/skill list` to browse all skills, `/skill remove` to deactivate
+  - **Skill picker button**: lightning bolt button next to send -- click to browse all skills grouped by category, click a skill to activate instantly. Includes "Import from Community" and "Upload .md" buttons directly in the dropdown
+  - **Slash autocomplete**: typing `/s` anywhere in the input triggers a floating dropdown with filtered skills -- arrow keys to navigate, Enter to select, works mid-sentence
+  - **Active skill badge**: shows the active skill name and category above the input with an X button to remove. Persists across messages until changed or removed
+  - **Persistent activation**: once activated, skill context is included with every subsequent message (prepended for new queries, injected via guidance queue for running agents)
+  - **Global Settings tab**: new "Chat Skills" tab between Agent Skills and API Keys with upload, edit description, download, delete, and category filtering
+  - **Import from Community**: bulk-import all 36 shipped reference skills (or community Agent Skills) with one click -- available in both Global Settings and the chat skill picker
+  - **WebSocket integration**: `SKILL_INJECT` / `SKILL_INJECT_ACK` message types push skill content through the existing guidance queue pipeline
+  - **Database**: `UserChatSkill` Prisma model with per-user storage, category field, and full CRUD API routes
+  - **36 community Chat Skills** by [@blackkhawkk](https://github.com/blackkhawkk) covering 7 categories: vulnerabilities (17), tooling (9), scan modes (3), frameworks (3), technologies (2), protocols (1), coordination (1)
+  - **15 skill categories**: general, vulnerabilities, tooling, scan_modes, frameworks, technologies, protocols, coordination, cloud, mobile, api_security, wireless, network, active_directory, social_engineering, reporting
+  - **Security**: path traversal protection in `load_skill_content()` via `.resolve().is_relative_to()` containment check
+
+- **Amass Brute Force Wordlist Selector** -- configurable wordlist selection for Amass DNS brute forcing:
+  - **Wordlist selector UI**: checkbox list under the Amass Bruteforce toggle in project settings. Amass Default (~8K entries) is always active and cannot be unchecked. jhaddix all.txt (~2.18M entries) is optional with time estimate badge
+  - **jhaddix all.txt**: Jason Haddix's comprehensive subdomain wordlist (~2.18M entries compiled from certificate transparency, bug bounty findings, DNS datasets) baked into the `redamon-recon` Docker image
+  - **Prisma schema**: `amassBruteWordlists` JSON field on Project model (default: `["default"]`)
+  - **Future extensibility**: adding more wordlists is just a `.txt` file in `recon/wordlists/` + a checkbox entry in the UI
+
+- **Import from Community for Agent Skills** -- new "Import from Community" button in Global Settings > Agent Skills tab. Bulk-imports all `.md` workflow files from `agentic/community-skills/` into the user's personal Agent Skills library with duplicate-by-name skipping
+
+### Fixed
+
+- **Amass wordlist mount bug** -- `os.path.isfile()` was checking a host filesystem path from inside the recon container, always returning `False`. The jhaddix wordlist was never mounted into the Amass container. Fixed to check the container-local path (`/app/recon/wordlists/jhaddix-all.txt`) and use the host path only for the Docker `-v` bind mount
+
+### Removed
+
+- **Claude Code proxy and provider** -- removed the host-side FastAPI proxy (`claude_proxy/server.py`), the `claude_code` LLM provider type, `ClaudeCodeToolManager`, auto-fallback logic, Docker credential mounts, and all related frontend/settings code. The OAuth token used by Claude Code is scoped to `user:sessions:claude_code` -- using it outside Claude Code is against Anthropic's Terms of Service. Users should use the existing Anthropic provider with a standard API key from console.anthropic.com
+
+- **OSINT agent tools** -- removed 7 incomplete tool manager classes (Censys, FOFA, OTX, Netlas, VirusTotal, ZoomEye, CriminalIP) from the agent. Missing 7 of 13 required integration steps (no TOOL_REGISTRY entries, no Tool Matrix UI, no stealth rules, no execute() dispatch). The recon pipeline integration for these services is unaffected. See `PROMPT.ADD_AGENTIC_TOOL.md` for the full integration checklist if re-adding later
+
+- **Always-on specialist skills injection** -- removed the `AGENT_SKILLS` project setting, `agentSkills` Prisma column, `build_skills_prompt_section()`, and the AgentBehaviourSection skill pills UI. Replaced by the on-demand Chat Skills system above
+
+---
+
 ## [3.2.0] - 2026-03-31
 
 ### Added

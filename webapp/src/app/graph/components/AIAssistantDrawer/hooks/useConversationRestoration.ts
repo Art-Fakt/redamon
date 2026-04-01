@@ -3,6 +3,7 @@ import type { Conversation } from '@/hooks/useConversations'
 import type { TodoItem } from '@/lib/websocket-types'
 import type { ChatItem, Message, FileDownloadItem, Phase } from '../types'
 import type { ThinkingItem, ToolExecutionItem, PlanWaveItem, DeepThinkItem } from '../AgentTimeline'
+import type { ActiveSkill } from './useSendHandlers'
 
 interface ConversationRestorationDeps {
   // From useConversations
@@ -36,6 +37,9 @@ interface ConversationRestorationDeps {
   awaitingToolConfirmationRef: React.MutableRefObject<boolean>
   pendingApprovalToolId: React.MutableRefObject<string | null>
   pendingApprovalWaveId: React.MutableRefObject<string | null>
+  // Active skill
+  setActiveSkill: (v: ActiveSkill | null) => void
+  updateConvMeta: (updates: Record<string, any>) => Promise<void>
   // Main component
   handleNewChat: () => void
 }
@@ -53,6 +57,7 @@ export function useConversationRestoration(deps: ConversationRestorationDeps) {
     setAwaitingToolConfirmation, setToolConfirmationRequest,
     awaitingApprovalRef, awaitingQuestionRef, awaitingToolConfirmationRef,
     pendingApprovalToolId, pendingApprovalWaveId,
+    setActiveSkill, updateConvMeta,
     handleNewChat,
   } = deps
 
@@ -555,6 +560,26 @@ export function useConversationRestoration(deps: ConversationRestorationDeps) {
     shouldAutoScroll.current = true
     setShowHistory(false)
 
+    // Restore active skill from conversation
+    if (conv.activeSkillId) {
+      try {
+        const res = await fetch(`/api/users/${userId}/chat-skills/${conv.activeSkillId}`)
+        if (res.ok) {
+          const skill = await res.json()
+          setActiveSkill({ id: skill.id, name: skill.name, category: skill.category, content: skill.content })
+        } else if (res.status === 404) {
+          // Skill was deleted, clear from conversation
+          updateConvMeta({ activeSkillId: '' }).catch(() => {})
+          setActiveSkill(null)
+        }
+      } catch {
+        // Skill may have been deleted or network error
+        setActiveSkill(null)
+      }
+    } else {
+      setActiveSkill(null)
+    }
+
     if (lastApprovalRequest && !hasWorkAfterApproval) {
       setAwaitingApproval(true)
       setApprovalRequest(lastApprovalRequest)
@@ -589,7 +614,7 @@ export function useConversationRestoration(deps: ConversationRestorationDeps) {
 
     isRestoringConversation.current = true
     onSwitchSession?.(conv.sessionId)
-  }, [loadConversation, onSwitchSession])
+  }, [loadConversation, onSwitchSession, userId, setActiveSkill, updateConvMeta])
 
   const handleHistoryNewChat = useCallback(() => {
     setShowHistory(false)

@@ -412,6 +412,12 @@ An **LLM-powered Intent Router** classifies user requests into agent skills: CVE
 
 > **[Wiki: Agent Skills](https://github.com/samugit83/redamon/wiki/Agent-Skills)** | **[Community Skills](agentic/community-skills/)**
 
+### Chat Skills
+
+**On-demand reference injection** via `/skill` command in the agent chat. Chat Skills are tactical reference docs -- tool playbooks, vulnerability guides, framework-specific notes -- that you inject into the agent's context exactly when you need them. Type `/skill ssrf` to load SSRF expertise, or click the skill picker button for a browsable list. 36 community-contributed skills ship with RedAmon covering vulnerabilities, tooling, scan modes, frameworks, technologies, and protocols. Unlike Agent Skills (which drive classification and phase-aware workflows), Chat Skills are supplementary context that persists until you change or remove them.
+
+> **[Wiki: Chat Skills](https://github.com/samugit83/redamon/wiki/Chat-Skills)** | **[Community Chat Skills](agentic/skills/)**
+
 ### GitHub Secret Hunter
 
 Scans GitHub repositories, gists, and commit history for exposed secrets using **40+ regex patterns** and Shannon entropy analysis.

@@ -8,6 +8,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import type { ActiveSkill } from './hooks/useSendHandlers'
 import styles from './AIAssistantDrawer.module.css'
 
 // Hooks
@@ -66,6 +67,7 @@ export function AIAssistantDrawer({
   graphViewCypher,
 }: AIAssistantDrawerProps) {
   // ─── State hooks ─────────────────────────────────────────────────────────────
+  const [activeSkill, setActiveSkill] = useState<ActiveSkill | null>(null)
   const statusWord = useLoadingWord()
 
   const {
@@ -147,6 +149,7 @@ export function AIAssistantDrawer({
   // ─── handleNewChat (cross-cutting — touches state from multiple hooks) ─────
   // Defined before useConversationRestoration via a stable ref pattern
   const handleNewChatRef = useRef<() => void>(() => {})
+  const updateConvMetaRef = useRef<(updates: Record<string, any>) => Promise<void>>(async () => {})
 
   // ─── Conversation restoration ──────────────────────────────────────────────
   const {
@@ -183,10 +186,15 @@ export function AIAssistantDrawer({
     awaitingToolConfirmationRef,
     pendingApprovalToolId,
     pendingApprovalWaveId,
+    setActiveSkill,
+    updateConvMeta: useCallback((updates: Record<string, any>) => updateConvMetaRef.current(updates), []),
     handleNewChat: useCallback(() => handleNewChatRef.current(), []),
   })
 
   const { saveMessage, updateConversation: updateConvMeta } = useChatPersistence(conversationId)
+
+  // Keep ref up-to-date for useConversationRestoration
+  useEffect(() => { updateConvMetaRef.current = updateConvMeta }, [updateConvMeta])
 
   // Now that we have setConversationId and setShowHistory, define handleNewChat
   const handleNewChat = useCallback(() => {
@@ -195,8 +203,9 @@ export function AIAssistantDrawer({
     resetScrollState()
     setConversationId(null)
     setShowHistory(false)
+    setActiveSkill(null)
     onResetSession?.()
-  }, [resetChatState, resetInteractionState, resetScrollState, setConversationId, setShowHistory, onResetSession])
+  }, [resetChatState, resetInteractionState, resetScrollState, setConversationId, setShowHistory, setActiveSkill, onResetSession])
 
   // Keep ref up-to-date
   useEffect(() => { handleNewChatRef.current = handleNewChat }, [handleNewChat])
@@ -239,10 +248,12 @@ export function AIAssistantDrawer({
     handleResume,
     handleKeyDown,
     handleInputChange,
+    activateSkill,
   } = useSendHandlers({
     inputValue, setInputValue,
     isLoading, setIsLoading, setIsStopped, setIsStopping,
     setChatItems, chatItems,
+    activeSkill, setActiveSkill,
     awaitingApproval, setAwaitingApproval, setApprovalRequest, modificationText, setModificationText,
     awaitingQuestion, setAwaitingQuestion, questionRequest, setQuestionRequest,
     answerText, setAnswerText, selectedOptions, setSelectedOptions,
@@ -291,6 +302,7 @@ export function AIAssistantDrawer({
     resetInteractionState()
     resetScrollState()
     setConversationId(null)
+    setActiveSkill(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
@@ -410,6 +422,11 @@ export function AIAssistantDrawer({
         awaitingApproval={awaitingApproval}
         awaitingQuestion={awaitingQuestion}
         awaitingToolConfirmation={awaitingToolConfirmation}
+        userId={userId}
+        setInputValue={setInputValue}
+        activeSkill={activeSkill}
+        setActiveSkill={setActiveSkill}
+        onSkillActivate={activateSkill}
       />
 
       <ApiKeyModal

@@ -635,6 +635,7 @@ model Conversation {
   agentRunning   Boolean       @default(false) @map("agent_running")
   currentPhase   String        @default("informational") @map("current_phase")
   iterationCount Int           @default(0) @map("iteration_count")
+  activeSkillId  String        @default("") @map("active_skill_id")
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   messages       ChatMessage[]

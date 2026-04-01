@@ -1439,6 +1439,14 @@ export default function SettingsPage() {
             <option value="technologies">technologies</option>
             <option value="protocols">protocols</option>
             <option value="coordination">coordination</option>
+            <option value="cloud">cloud</option>
+            <option value="mobile">mobile</option>
+            <option value="api_security">api_security</option>
+            <option value="wireless">wireless</option>
+            <option value="network">network</option>
+            <option value="active_directory">active_directory</option>
+            <option value="social_engineering">social_engineering</option>
+            <option value="reporting">reporting</option>
           </select>
           <span className="formHint">
             Categorize this skill for easier browsing.
