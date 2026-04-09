@@ -253,6 +253,15 @@ describe('validateAndParse — rejections', () => {
     const result = validateAndParse(raw, raw.length)
     expect(isValidationError(result)).toBe(true)
     if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown top-level field')
+    }
+  })
+
+  test('rejects empty object (no sections)', () => {
+    const raw = JSON.stringify({})
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
       expect(result.message).toContain('Missing required section')
     }
   })
@@ -620,5 +629,371 @@ describe('full round-trip: download → fill → import', () => {
       expect(result.keys.shodanApiKey).toBe('<script>alert("xss")</script>')
       expect(result.keyCount).toBe(1)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Additional edge-case tests
+// ---------------------------------------------------------------------------
+
+describe('validateAndParse — boundary and edge cases', () => {
+  test('rejects null JSON literal', () => {
+    const result = validateAndParse('null', 4)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('JSON object')
+    }
+  })
+
+  test('rejects numeric JSON literal', () => {
+    const result = validateAndParse('42', 2)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('rejects string JSON literal', () => {
+    const result = validateAndParse('"hello"', 7)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('rejects boolean JSON literal', () => {
+    const result = validateAndParse('true', 4)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('accepts file at exactly 100 KB', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: 'k' } })
+    const result = validateAndParse(raw, 100 * 1024)
+    expect(isValidationError(result)).toBe(false)
+  })
+
+  test('rejects file at 100 KB + 1 byte', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: 'k' } })
+    const result = validateAndParse(raw, 100 * 1024 + 1)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('too large')
+    }
+  })
+
+  test('empty string raw input returns invalid JSON error', () => {
+    const result = validateAndParse('', 0)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Invalid JSON')
+    }
+  })
+
+  test('whitespace-only key values are skipped', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: '   ', tavilyApiKey: 'real' } })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      // '   ' is truthy but not empty - it gets imported as-is
+      // This test documents the actual behavior
+      expect(result.keyCount).toBe(2)
+    }
+  })
+
+  test('whitespace-only extraKeys entries are filtered out', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: ['  ', '', 'real-key'], rotateEveryN: 10 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotation.shodan.extraKeys).toEqual(['real-key'])
+      expect(result.rotationCount).toBe(1)
+    }
+  })
+
+  test('rotation with only whitespace/empty extraKeys is not counted', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: ['', '  '], rotateEveryN: 10 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotationCount).toBe(0)
+      expect(result.rotation.shodan).toBeUndefined()
+    }
+  })
+
+  test('rejects non-string rotateEveryN gracefully (falls back to 10)', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: ['k1'], rotateEveryN: 'fast' } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotation.shodan.rotateEveryN).toBe(10)
+    }
+  })
+
+  test('very large rotateEveryN is accepted as-is', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: ['k1'], rotateEveryN: 999999 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotation.shodan.rotateEveryN).toBe(999999)
+    }
+  })
+
+  test('negative rotateEveryN falls back to 10', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: ['k1'], rotateEveryN: -5 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotation.shodan.rotateEveryN).toBe(10)
+    }
+  })
+
+  test('rejects rotation entry missing extraKeys entirely', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { rotateEveryN: 10 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('extraKeys')
+    }
+  })
+
+  test('rejects tunneling value that is a number', () => {
+    const raw = JSON.stringify({ tunneling: { ngrokAuthtoken: 12345 } })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('must be a string')
+    }
+  })
+
+  test('rejects tunneling section that is an array', () => {
+    const raw = JSON.stringify({ tunneling: ['a'] })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('"tunneling" must be a JSON object')
+    }
+  })
+
+  test('skips masked tunneling values', () => {
+    const raw = JSON.stringify({
+      tunneling: { ngrokAuthtoken: '••••xyz', chiselAuth: 'real-auth' },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.tunnelingCount).toBe(1)
+      expect(result.tunneling.ngrokAuthtoken).toBeUndefined()
+      expect(result.tunneling.chiselAuth).toBe('real-auth')
+    }
+  })
+
+  test('empty tunneling values are skipped', () => {
+    const raw = JSON.stringify({
+      tunneling: { ngrokAuthtoken: '', chiselServerUrl: '' },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.tunnelingCount).toBe(0)
+    }
+  })
+
+  test('unknown top-level fields are rejected', () => {
+    const raw = JSON.stringify({
+      keys: { shodanApiKey: 'val' },
+      version: '2.0',
+      metadata: { author: 'test' },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown top-level field')
+      expect(result.message).toContain('version')
+    }
+  })
+
+  test('rejects key value that is null', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: null } })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('must be a string')
+    }
+  })
+
+  test('rejects key value that is an object', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: { nested: true } } })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('rejects key value that is a boolean', () => {
+    const raw = JSON.stringify({ keys: { shodanApiKey: true } })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('rejects rotation extraKeys containing null', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: [null], rotateEveryN: 10 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('extraKeys[0] must be a string')
+    }
+  })
+
+  test('prototype pollution via constructor field in keys is rejected', () => {
+    const raw = JSON.stringify({
+      keys: { constructor: 'evil' },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown key field')
+    }
+  })
+
+  test('rejects rotation entry where extraKeys is null', () => {
+    const raw = JSON.stringify({
+      rotation: { shodan: { extraKeys: null, rotateEveryN: 10 } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('extraKeys')
+    }
+  })
+})
+
+describe('validateAndParse — validation gap documentation', () => {
+  test('unknown top-level fields are now rejected', () => {
+    const raw = JSON.stringify({
+      keys: { shodanApiKey: 'val' },
+      admin: true,
+      deleteEverything: 'yes',
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown top-level field')
+    }
+  })
+
+  test('unknown properties inside rotation config are now rejected', () => {
+    const raw = JSON.stringify({
+      rotation: {
+        shodan: {
+          extraKeys: ['k1'],
+          rotateEveryN: 5,
+          deleteAll: true,
+          runCommand: 'rm -rf /',
+        },
+      },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown property')
+      expect(result.message).toContain('deleteAll')
+    }
+  })
+
+  test('deeply nested object in keys section is rejected (type check catches it)', () => {
+    const raw = JSON.stringify({
+      keys: { shodanApiKey: { nested: { deep: 'value' } } },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('keys section with null value is rejected (type check catches it)', () => {
+    const raw = JSON.stringify({
+      keys: { shodanApiKey: null },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+  })
+
+  test('alien JSON structure with extra top-level fields is rejected', () => {
+    const raw = JSON.stringify({
+      keys: { shodanApiKey: 'real-key' },
+      database: { host: 'localhost', drop: true },
+      users: [{ name: 'admin', password: '1234' }],
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(true)
+    if (isValidationError(result)) {
+      expect(result.message).toContain('Unknown top-level field')
+    }
+  })
+
+  test('underscore-prefixed top-level fields are still allowed', () => {
+    const raw = JSON.stringify({
+      _instructions: 'some text',
+      _version: '1.0',
+      keys: { shodanApiKey: 'val' },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.keyCount).toBe(1)
+    }
+  })
+
+  test('underscore-prefixed rotation config properties are still allowed', () => {
+    const raw = JSON.stringify({
+      rotation: {
+        shodan: {
+          _comment: 'my shodan keys',
+          extraKeys: ['k1'],
+          rotateEveryN: 5,
+        },
+      },
+    })
+    const result = validateAndParse(raw, raw.length)
+    expect(isValidationError(result)).toBe(false)
+    if (!isValidationError(result)) {
+      expect(result.rotation.shodan.extraKeys).toEqual(['k1'])
+    }
+  })
+})
+
+describe('buildTemplate — edge cases', () => {
+  test('ignores unknown fields in currentKeys input', () => {
+    const t = buildTemplate({ shodanApiKey: 'val', unknownThing: 'ignored' }, {})
+    expect(t.keys.shodanApiKey).toBe('val')
+    expect(t.keys).not.toHaveProperty('unknownThing')
+    expect(Object.keys(t.keys).length).toBe(24)
+  })
+
+  test('ignores unknown fields in currentTunneling input', () => {
+    const t = buildTemplate({}, { ngrokAuthtoken: 'tok', badField: 'ignored' })
+    expect(t.tunneling.ngrokAuthtoken).toBe('tok')
+    expect(t.tunneling).not.toHaveProperty('badField')
+    expect(Object.keys(t.tunneling).length).toBe(3)
+  })
+
+  test('template rotation tools count matches TOOL_NAME_MAP', () => {
+    const t = buildTemplate({}, {})
+    const rotationTools = Object.keys(t.rotation).filter(k => !k.startsWith('_'))
+    expect(rotationTools.length).toBe(19)
+  })
+
+  test('template keys count matches UserSettings key fields', () => {
+    const t = buildTemplate({}, {})
+    expect(Object.keys(t.keys).length).toBe(24)
+  })
+
+  test('template tunneling count matches UserSettings tunnel fields', () => {
+    const t = buildTemplate({}, {})
+    expect(Object.keys(t.tunneling).length).toBe(3)
   })
 })

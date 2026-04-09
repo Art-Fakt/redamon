@@ -362,6 +362,11 @@ For MCP tools that accept an optional API key via CLI flag (tool works without i
 - [ ] **`webapp/src/app/graph/components/AIAssistantDrawer/hooks/useApiKeyModal.ts`** — Add to `API_KEY_INFO` dict (top of file) and missing key detection in `fetchApiKeyStatus()`. This is a **duplicate** of the ToolMatrix key check — the chat drawer also warns users about missing API keys.
 - [ ] **`webapp/src/app/graph/components/AIAssistantDrawer/ToolExecutionCard.tsx`** — Add to `TOOL_KEY_LABEL` dict (line 15-19) — maps tool name to human-readable label shown on tool cards in chat when key is missing.
 
+#### API Keys Import/Export Template (Type D or any tool needing API keys)
+
+- [ ] **`webapp/src/lib/apiKeysTemplate.ts`** — Add new key to `ALLOWED_KEY_FIELDS` and rotation tool name to `ALLOWED_ROTATION_TOOLS`. These must stay in sync with `UserSettings` interface and `TOOL_NAME_MAP` in `settings/page.tsx`.
+- [ ] **`webapp/src/lib/apiKeysTemplate.test.ts`** — Update test counts to match (key count, rotation count, round-trip test).
+
 #### Progress Streaming (if long-running tool, >60s typical)
 
 - [ ] **MCP server** — Add progress tracking (read Hydra pattern in `network_recon_server.py`: thread-safe state, background subprocess, HTTP progress endpoint)
@@ -449,7 +454,9 @@ If the tool is the PRIMARY tool for a new built-in attack skill (like Hydra is f
 | `webapp/src/app/graph/components/AIAssistantDrawer/ToolExecutionCard.tsx` | `TOOL_KEY_LABEL` — human label on tool cards when key missing | If tool needs API keys |
 | `webapp/src/app/api/users/[id]/settings/route.ts` | API key storage, masking, PUT whitelist | If tool needs API keys |
 | `webapp/src/app/api/users/[id]/attack-skills/available/route.ts` | Built-in skills list | If part of new attack skill |
-| `webapp/src/app/settings/page.tsx` | Global Settings — API key inputs with `SecretField` | If tool needs API keys |
+| `webapp/src/app/settings/page.tsx` | Global Settings — API key inputs with `SecretField`, `UserSettings` interface, `TOOL_NAME_MAP` | If tool needs API keys |
+| `webapp/src/lib/apiKeysTemplate.ts` | Bulk import/export JSON template — `ALLOWED_KEY_FIELDS`, `ALLOWED_ROTATION_TOOLS`, `ALLOWED_TUNNEL_FIELDS` allowlists | If tool needs API keys |
+| `webapp/src/lib/apiKeysTemplate.test.ts` | 82 unit tests for template generation and validation — field counts, round-trips, injection tests | If tool needs API keys (update counts) |
 | `docker-compose.yml` | Root compose — agent env vars, kali-sandbox ports | Type C |
 | `agentic/docker-compose.yml` | Dev compose — agent env vars | Type C |
 | `agentic/api.py` | Agent `/defaults` endpoint | If tool has configurable settings |

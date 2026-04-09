@@ -167,7 +167,9 @@ Integrate **[TOOL_NAME]** into the RedAmon recon pipeline.
   3. Call `renderMyTool(data)` in the main `generateReportHtml()` function alongside the other render calls
 - [ ] **Report LLM condensing** (`webapp/src/app/api/projects/[id]/reports/route.ts`):
   1. Add the tool's summarized data to the `condenseForAgent()` payload — include totals, breakdowns, and a capped subset of findings (15-20 items max) so the LLM can generate narrative text about the tool's results
-- [ ] If tool needs API keys: add field to `UserSettings` model in Prisma, fetch at runtime via `_fetch_user_api_key()`, show key status banner in frontend section
+- [ ] If tool needs API keys: add field to `UserSettings` model in Prisma, fetch at runtime via `_fetch_user_api_key()`, show key status banner in frontend section. **Also update the API keys import/export template** (see checklist item below).
+- [ ] **API Keys Import/Export Template** (only if tool uses API keys stored in `UserSettings`):
+  Update `webapp/src/lib/apiKeysTemplate.ts`: add new key to `ALLOWED_KEY_FIELDS` and rotation tool name to `ALLOWED_ROTATION_TOOLS`. Update test counts in `webapp/src/lib/apiKeysTemplate.test.ts` to match.
 - [ ] If tool is active (sends traffic to target): add overrides in `apply_stealth_overrides()` in `recon/project_settings.py`
 - [ ] If tool is involved in subdomain enumeration: results may include out-of-scope subdomains (e.g., related but not under the target root domain). These must be split into in-scope `subdomains` vs `external_domains` — follow the existing pattern in `recon/domain_recon.py` where discovered subdomains are checked against the target domain and out-of-scope entries are collected separately as external domains
 - [ ] **Logging format**: All `print()` log lines MUST follow the standard `[symbol][ToolName] message` format used throughout the recon pipeline. The symbol prefix indicates the log level/type:

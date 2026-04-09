@@ -137,6 +137,15 @@ export function validateAndParse(raw: string, fileSize: number): ParsedImport | 
   const hasRotation = 'rotation' in obj
   const hasTunneling = 'tunneling' in obj
 
+  // Reject unknown top-level fields
+  const ALLOWED_TOP_LEVEL = new Set(['keys', 'rotation', 'tunneling'])
+  for (const field of Object.keys(obj)) {
+    if (field.startsWith('_')) continue
+    if (!ALLOWED_TOP_LEVEL.has(field)) {
+      return { message: `Unknown top-level field: "${field}". Only "keys", "rotation", and "tunneling" are accepted.` }
+    }
+  }
+
   if (!hasKeys && !hasRotation && !hasTunneling) {
     return { message: 'Missing required section — file must contain at least one of: "keys", "rotation", "tunneling".' }
   }
@@ -207,6 +216,14 @@ export function validateAndParse(raw: string, fileSize: number): ParsedImport | 
         return { message: `Rotation config for "${tool}" must be an object.` }
       }
       const rotCfg = cfg as Record<string, unknown>
+      // Reject unknown properties inside rotation config
+      const ALLOWED_ROTATION_PROPS = new Set(['extraKeys', 'rotateEveryN'])
+      for (const prop of Object.keys(rotCfg)) {
+        if (prop.startsWith('_')) continue
+        if (!ALLOWED_ROTATION_PROPS.has(prop)) {
+          return { message: `Unknown property "${prop}" in rotation config for "${tool}". Only "extraKeys" and "rotateEveryN" are accepted.` }
+        }
+      }
       if (!('extraKeys' in rotCfg) || !Array.isArray(rotCfg.extraKeys)) {
         return { message: `Rotation "${tool}": "extraKeys" must be an array of strings.` }
       }
