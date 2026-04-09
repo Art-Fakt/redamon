@@ -22,13 +22,61 @@ TOOL_REGISTRY = {
         ),
     },
     "web_search": {
-        "purpose": "Web search (Tavily)",
-        "when_to_use": "Research CVEs, exploits, service vulns",
-        "args_format": '"query": "search query for CVE details, exploit techniques, etc."',
+        "purpose": "Knowledge base + web search",
+        "when_to_use": "Research CVEs, exploits, tool flags, methodology, priv-esc",
+        "args_format": (
+            '"query": "search query", '
+            '"include_sources": ["tool_docs"|"gtfobins"|"lolbas"|"owasp"|"nvd"|"exploitdb"|"nuclei"] (optional), '
+            '"exclude_sources": [...] (optional), '
+            '"top_k": 1-20 (optional, default 5), '
+            '"min_cvss": 0.0-10.0 (optional, NVD only)'
+        ),
         "description": (
-            '**web_search** (SECONDARY — external research)\n'
-            '   - Search the internet via Tavily for CVE details, exploit PoCs, advisories, '
-            'Metasploit module docs, version-specific vulns\n'
+            '**web_search** (SECONDARY — KB + external research)\n'
+            '   - Checks the local Knowledge Base first (curated, ~50ms), then falls back to '
+            'Tavily web search if no strong local match.\n'
+            '   - **KB sources** (pass via `include_sources` arg to scope your query — significantly improves relevance):\n'
+            '     - `tool_docs`: sqlmap/nmap/hydra/nuclei/ffuf/httpx flags + framework guides '
+            '(FastAPI, NestJS, Next.js, GraphQL, Supabase) + vuln testing methodology '
+            '(XSS, SQLi, IDOR, SSRF, RCE, XXE, CSRF, JWT, race conditions, mass assignment)\n'
+            '     - `gtfobins`: Linux priv-esc one-liners (python, vim, find, awk, tar...)\n'
+            '     - `lolbas`: Windows LOLBin abuse (certutil, mshta, regsvr32...) with MITRE IDs\n'
+            '     - `owasp`: OWASP WSTG test cases by category and WSTG ID\n'
+            '     - `nvd`: CVE descriptions with CVSS, severity, affected products\n'
+            '     - `exploitdb`: Public exploit titles + descriptions (use `searchsploit` via '
+            'kali_shell for exploit code)\n'
+            '     - `nuclei`: Nuclei template metadata (use `execute_nuclei` for actual scanning)\n'
+            '   - **Args**:\n'
+            '     - `include_sources` (list[str], optional): Allowlist — restrict to these KB '
+            'sources. Use when you KNOW the right source. Omit to search everything.\n'
+            '     - `exclude_sources` (list[str], optional): Blocklist — drop these sources '
+            'after the include filter. Use to remove high-volume noise on broad queries. '
+            'ExploitDB has ~46k chunks vs LOLBAS\'s 451 — excluding it on concept queries '
+            'stops exploit titles from drowning out methodology hits.\n'
+            '     - `top_k` (int, optional, default 5, max 20): Number of results to return. '
+            'Keep at 5 for targeted lookups (single CVE, specific flag). Bump to 10–15 for '
+            'broad/exploratory queries or when a narrow first call returned partial results.\n'
+            '     - `min_cvss` (float, optional, 0.0–10.0): Minimum CVSS for NVD chunks. '
+            '9.0 = critical only, 7.0 = high+critical. Other sources unaffected.\n'
+            '   - **Scoping patterns**:\n'
+            '     - Targeted (existing pattern, just renamed):\n'
+            '         `web_search("nuclei -rl flag", include_sources=["tool_docs"])`\n'
+            '     - Broad with noise removal:\n'
+            '         `web_search("SSRF cloud metadata", exclude_sources=["exploitdb", "nvd"], top_k=15)`\n'
+            '     - Critical CVEs only:\n'
+            '         `web_search("Apache RCE", include_sources=["nvd"], min_cvss=9.0)`\n'
+            '     - Broad sweep across operational sources:\n'
+            '         `web_search("kubernetes priv esc", include_sources=["tool_docs", "lolbas", "gtfobins"], top_k=12)`\n'
+            '     - Re-query strategy: first call narrow, second call wider if needed:\n'
+            '         `web_search("Cisco IOS auth bypass")`           # default top_k=5\n'
+            '         `web_search("Cisco IOS auth bypass", top_k=15)` # if first call missed it\n'
+            '   - **Single-source shortcuts**:\n'
+            '     - sqlmap/nmap flag question → `include_sources=["tool_docs"]`\n'
+            '     - Linux priv-esc → `include_sources=["gtfobins"]`\n'
+            '     - Windows LOLBin abuse → `include_sources=["lolbas"]`\n'
+            '     - OWASP methodology → `include_sources=["owasp"]`\n'
+            '     - CVE lookup → `include_sources=["nvd", "exploitdb"]`\n'
+            '     - Open-ended research → omit both source args\n'
             '   - Use AFTER query_graph when you need context not in the graph'
         ),
     },

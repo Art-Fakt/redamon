@@ -64,14 +64,66 @@ RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev && r
     && ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet
 ENV DOTNET_ROOT="/usr/share/dotnet"
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy requirements first for better caching.
+# NOTE: build context is the project root (./), not ./agentic — see docker-compose.yml
+COPY agentic/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download the embedding model so the first agent boot doesn't have to wait
+# for a ~1.3GB download. The model is cached at /root/.cache/huggingface/.
+# Override at build time with --build-arg KB_EMBEDDING_MODEL=<other-model>.
+ARG KB_EMBEDDING_MODEL=intfloat/e5-large-v2
+ENV KB_EMBEDDING_MODEL=${KB_EMBEDDING_MODEL}
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${KB_EMBEDDING_MODEL}')"
+
+# Pre-download the cross-encoder reranker model so the first KB query doesn't
+# pay a ~568 MB download at runtime. Used by knowledge_base.reranker.CrossEncoderReranker
+# in the hybrid retrieval pipeline.
+#
+# Default is BAAI/bge-reranker-base — significantly better at security/technical
+# content than the smaller MS MARCO models. ~568 MB, ~300 ms per top-30 query
+# on CPU. Override at build time with --build-arg KB_RERANKER_MODEL=<other>.
+# Disable the reranker entirely at runtime via KB_RERANK_ENABLED=false.
+ARG KB_RERANKER_MODEL=BAAI/bge-reranker-base
+ENV KB_RERANKER_MODEL=${KB_RERANKER_MODEL}
+RUN python -c "from sentence_transformers import CrossEncoder; CrossEncoder('${KB_RERANKER_MODEL}')"
+
 # Copy application code
-COPY . .
+# - graph_db/ : shared Neo4j schema (used by both agent and KB)
+# - knowledge_base/ : KB package (sibling to agentic/, imported as `knowledge_base`)
+# - agentic/ : the agent itself (orchestrator, tools, prompts, skills, ...)
+COPY graph_db/ ./graph_db/    
+COPY knowledge_base/ ./knowledge_base/
+COPY agentic/ ./
+
+# Make knowledge_base and graph_db importable as top-level packages
+ENV PYTHONPATH="/app:${PYTHONPATH}"
+
+# Ensure KB data + cache directories exist (mounted as a volume at runtime).
+# Created BEFORE the chmod -R a-w below so the volume mountpoint exists when
+# nothing is mounted (the agent gracefully degrades to no-op KB in that case).
+RUN mkdir -p /app/knowledge_base/data/sources /app/knowledge_base/data/cache
+
+# Note: the container currently runs as root (no USER directive), so
+# CAP_DAC_OVERRIDE lets the process bypass these permissions at runtime.
+# The chmod still provides defense-in-depth against accidental writes
+# (typos, buggy code) and surfaces EACCES errors early instead of silent
+# corruption. For stronger enforcement, add a non-root USER directive
+# and drop CAP_DAC_OVERRIDE via docker-compose.
+#
+# The `|| true` fallback is scoped to ONLY the __pycache__ chmod via
+# parentheses — a failure of the two chmods above is a real build failure,
+# not silently swallowed. Previously the ungrouped `|| true` applied to
+# the whole `&&` chain and could ship an image with writable source code
+# if any chmod in the chain failed. The __pycache__ restore itself is a
+# no-op under PYTHONDONTWRITEBYTECODE=1 (set at the top of this file),
+# but preserved as a defensive fallback for anyone who unsets that env
+# var at runtime.
+RUN chmod -R a-w /app/knowledge_base \
+    && chmod -R u+w /app/knowledge_base/data \
+    && ( chmod -R u+w /app/knowledge_base/__pycache__ 2>/dev/null || true )
 
 # Expose API port
 EXPOSE 8080

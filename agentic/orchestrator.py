@@ -183,6 +183,65 @@ class AgentOrchestrator:
         if tavily_key and self._web_search_manager:
             self._web_search_manager.key_rotator = _build_rotator(tavily_key, 'tavily')
 
+        # Knowledge Base — apply per-project settings.
+        #
+        # Precedence: per-project value (non-None) > kb_config.yaml
+        # (loaded into the KB instance at construction time) > kb_config.py
+        # DEFAULTS. We only mutate live KB attributes when the
+        # project-level setting is non-None, so a None sentinel in
+        # DEFAULT_AGENT_SETTINGS preserves whatever the YAML loaded —
+        # the common case for operators who tune via kb_config.yaml and
+        # never touch the webapp UI.
+        if getattr(self, '_knowledge_base', None) and self._web_search_manager:
+            kb_enabled = get_setting('KB_ENABLED', None)
+            # None → inherit (default True from kb_config.yaml KB_ENABLED).
+            # False → explicit disable. True → explicit enable.
+            if kb_enabled is not False:
+                kb = self._knowledge_base
+
+                score_threshold = get_setting('KB_SCORE_THRESHOLD', None)
+                if score_threshold is not None:
+                    kb.score_threshold = score_threshold
+
+                top_k = get_setting('KB_TOP_K', None)
+                if top_k is not None:
+                    kb.top_k = top_k
+
+                # Ranking knobs (source boost + MMR diversity)
+                mmr_enabled = get_setting('KB_MMR_ENABLED', None)
+                if mmr_enabled is not None:
+                    kb.mmr_enabled = mmr_enabled
+
+                mmr_lambda = get_setting('KB_MMR_LAMBDA', None)
+                if mmr_lambda is not None:
+                    kb.mmr_lambda = mmr_lambda
+
+                overfetch_factor = get_setting('KB_OVERFETCH_FACTOR', None)
+                if overfetch_factor is not None:
+                    kb.overfetch_factor = overfetch_factor
+
+                custom_boosts = get_setting('KB_SOURCE_BOOSTS', None)
+                if custom_boosts:
+                    # Merge user overrides on top of whatever the KB
+                    # already loaded from kb_config.yaml source_boosts.
+                    # This preserves per-source tunings from the YAML
+                    # for sources the webapp override doesn't mention.
+                    existing = getattr(kb, 'source_boosts', None) or {}
+                    kb.source_boosts = {**existing, **custom_boosts}
+
+                self._web_search_manager.knowledge_base = kb
+                self._web_search_manager.kb_enabled_sources = get_setting(
+                    'KB_ENABLED_SOURCES', None
+                )
+            else:
+                # Project explicitly disabled KB — detach from web search
+                self._web_search_manager.knowledge_base = None
+                self._web_search_manager.kb_enabled_sources = None
+            # Rebuild web_search tool to reflect new KB state
+            new_tool = self._web_search_manager.get_tool()
+            if new_tool and self.tool_executor:
+                self.tool_executor.update_web_search_tool(new_tool)
+
         # Shodan
         shodan_key = user_settings.get('shodanApiKey', '')
         if self._shodan_manager and self.tool_executor:
@@ -263,8 +322,14 @@ class AgentOrchestrator:
         )
         graph_tool = self.neo4j_manager.get_tool()
 
+        # Setup Knowledge Base (FAISS + Neo4j hybrid)
+        self._knowledge_base = self._setup_knowledge_base()
+
         # Setup Tavily web search tool (key resolved later via update_tavily_key)
-        self._web_search_manager = WebSearchToolManager()
+        # KB is passed in so web_search can check it before falling back to Tavily
+        self._web_search_manager = WebSearchToolManager(
+            knowledge_base=self._knowledge_base,
+        )
         web_search_tool = self._web_search_manager.get_tool()
 
         # Setup Shodan OSINT tool (key resolved later via _apply_project_settings)
@@ -283,6 +348,54 @@ class AgentOrchestrator:
         self.tool_executor.register_mcp_tools(mcp_tools)
 
         logger.info(f"Tools initialized: {len(self.tool_executor.get_all_tools())} available")
+
+    def _setup_knowledge_base(self):
+        """
+        Initialize the Knowledge Base (FAISS + Neo4j) if enabled.
+
+        Returns:
+            PentestKnowledgeBase instance, or None if disabled or fails to load.
+        """
+        if os.getenv('KB_ENABLED', 'true').lower() != 'true':
+            logger.info("KB_ENABLED=false — skipping knowledge base setup")
+            return None
+
+        try:
+            from knowledge_base import PentestKnowledgeBase
+            from knowledge_base.faiss_indexer import FAISSIndexer
+            from knowledge_base.neo4j_loader import Neo4jLoader
+            from knowledge_base.embedder import Embedder
+            from neo4j import GraphDatabase
+        except ImportError as e:
+            logger.warning(f"Knowledge base dependencies missing: {e} — KB disabled")
+            return None
+
+        try:
+            kb_path = os.getenv('KB_PATH', '/app/knowledge_base/data')
+            model_name = os.getenv('KB_EMBEDDING_MODEL', 'intfloat/e5-large-v2')
+
+            embedder = Embedder(model_name=model_name)
+            faiss_indexer = FAISSIndexer(
+                index_path=kb_path,
+                dimensions=embedder.dimensions,
+            )
+
+            # Create a dedicated Neo4j driver for KB queries (separate from langchain wrapper)
+            neo4j_driver = GraphDatabase.driver(
+                self.neo4j_uri,
+                auth=(self.neo4j_user, self.neo4j_password),
+            )
+            neo4j_loader = Neo4jLoader(neo4j_driver)
+
+            kb = PentestKnowledgeBase(faiss_indexer, neo4j_loader, embedder)
+            kb.load()
+
+            stats = kb.stats()
+            logger.info(f"Knowledge base loaded: {stats}")
+            return kb
+        except Exception as e:
+            logger.warning(f"Failed to initialize knowledge base ({e}) — KB disabled, agent will fall back to Tavily")
+            return None
 
     def _build_graph(self) -> None:
         """Build the ReAct LangGraph with phase tracking."""
@@ -1132,5 +1245,16 @@ class AgentOrchestrator:
 
     async def close(self) -> None:
         """Clean up resources."""
+        # Close KB Neo4j driver if it was created
+        kb = getattr(self, '_knowledge_base', None)
+        if kb is not None and getattr(kb, 'neo4j', None) is not None:
+            try:
+                driver = getattr(kb.neo4j, 'driver', None)
+                if driver is not None:
+                    driver.close()
+                    logger.debug("Knowledge base Neo4j driver closed")
+            except Exception as e:
+                logger.warning(f"Error closing KB Neo4j driver: {e}")
+
         self._initialized = False
         logger.info("AgentOrchestrator closed")

@@ -359,7 +359,9 @@ services:
       pentest-net:
 
   agent:
-    build: ./agentic
+    build:
+      context: .
+      dockerfile: agentic/Dockerfile
     container_name: redamon-agent
     ports:
       - "${AGENT_PORT:-8090}:8080"
@@ -382,12 +384,16 @@ services:
       KALI_TERMINAL_WS_URL: ws://kali-sandbox:8016
       # Webapp API (internal docker network)
       WEBAPP_API_URL: http://webapp:3000
+      # Knowledge Base 
+      KB_ENABLED: "${KB_ENABLED:-true}"
+      KB_PATH: /app/knowledge_base/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./agentic:/app
       - ./agentic/logs:/app/logs
       - cypherfix-repos:/tmp/cypherfix-repos
+      - ./knowledge_base/kb_config.yaml:/app/knowledge_base/kb_config.yaml:ro
+      - ./knowledge_base/data:/app/knowledge_base/data:ro
     depends_on:
       neo4j:
         condition: service_healthy
@@ -402,6 +408,91 @@ services:
       start_period: 30s
     networks:
       - redamon
+
+  # ===========================================================================
+  # Knowledge Base Refresh Sidecar
+  # ===========================================================================
+  # Opt-in scheduled refresh for KB data sources. Reuses the agent image so we
+  # don't have to rebuild anything separately. Shares the kb_data volume with
+  # the agent so updates are immediately visible without restarting the agent.
+  #
+  # Schedule:
+  #   - Daily 03:00 UTC: NVD incremental update (~60 new CVEs/day)
+  #   - Mondays 04:00 UTC: ExploitDB + Nuclei templates
+  #   - 1st of month 05:00 UTC: GTFOBins + LOLBAS
+  #
+  # Enable with:
+  #   KB_REFRESH_ENABLED=true docker compose --profile kb-refresh up -d kb-refresh
+  #
+  # Or via redamon.sh once that integration lands. Default is OFF — users opt in.
+  # ===========================================================================
+
+  kb-refresh:
+    profiles: ["kb-refresh"]
+    build:
+      context: .
+      dockerfile: agentic/Dockerfile
+    image: redamon-agent
+    container_name: redamon-kb-refresh
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-changeme123}
+      KB_PATH: /app/knowledge_base/data
+      NVD_API_KEY: "${NVD_API_KEY:-}"
+    volumes:
+      - ./knowledge_base/kb_config.yaml:/app/knowledge_base/kb_config.yaml:ro
+      - kb_data:/app/knowledge_base/data
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - redamon
+    # Sleep loop scheduler — runs source updates on cadence.
+    # Production setups should replace this with a real cron container or
+    # external scheduler (host cron, systemd timer, GitHub Actions).
+    command: >
+      sh -c '
+      echo "[KB-REFRESH] sidecar started at $$(date -u +%Y-%m-%dT%H:%M:%SZ)";
+      while true; do
+        DAY_OF_WEEK=$$(date -u +%u);
+        DAY_OF_MONTH=$$(date -u +%d);
+        HOUR=$$(date -u +%H);
+
+        echo "[KB-REFRESH $$(date -u +%Y-%m-%dT%H:%M:%SZ)] daily NVD refresh";
+        python -m knowledge_base.curation.data_ingestion \
+          --source nvd \
+          --neo4j-uri bolt://neo4j:7687 \
+          --neo4j-user neo4j \
+          --neo4j-password $$NEO4J_PASSWORD \
+          $${NVD_API_KEY:+--nvd-key $$NVD_API_KEY} \
+          || echo "[KB-REFRESH] NVD refresh failed";
+
+        if [ "$$DAY_OF_WEEK" = "1" ]; then
+          echo "[KB-REFRESH $$(date -u +%Y-%m-%dT%H:%M:%SZ)] weekly ExploitDB + Nuclei refresh";
+          python -m knowledge_base.curation.data_ingestion --source exploitdb \
+            --neo4j-uri bolt://neo4j:7687 --neo4j-user neo4j --neo4j-password $$NEO4J_PASSWORD \
+            || echo "[KB-REFRESH] ExploitDB refresh failed";
+          python -m knowledge_base.curation.data_ingestion --source nuclei \
+            --neo4j-uri bolt://neo4j:7687 --neo4j-user neo4j --neo4j-password $$NEO4J_PASSWORD \
+            || echo "[KB-REFRESH] Nuclei refresh failed";
+        fi;
+
+        if [ "$$DAY_OF_MONTH" = "01" ]; then
+          echo "[KB-REFRESH $$(date -u +%Y-%m-%dT%H:%M:%SZ)] monthly GTFOBins + LOLBAS refresh";
+          python -m knowledge_base.curation.data_ingestion --source gtfobins \
+            --neo4j-uri bolt://neo4j:7687 --neo4j-user neo4j --neo4j-password $$NEO4J_PASSWORD \
+            || echo "[KB-REFRESH] GTFOBins refresh failed";
+          python -m knowledge_base.curation.data_ingestion --source lolbas \
+            --neo4j-uri bolt://neo4j:7687 --neo4j-user neo4j --neo4j-password $$NEO4J_PASSWORD \
+            || echo "[KB-REFRESH] LOLBAS refresh failed";
+        fi;
+
+        echo "[KB-REFRESH $$(date -u +%Y-%m-%dT%H:%M:%SZ)] sleeping 24h until next refresh";
+        sleep 86400;
+      done
+      '
 
   # ===========================================================================
   # Frontend
@@ -489,6 +580,8 @@ volumes:
   neo4j_logs:
   neo4j_import:
   neo4j_plugins:
+  kb_data:
+    name: redamon_kb_data
   # GVM volumes (names must match container_manager.py references)
   vt_data:
     name: redamon_vt_data

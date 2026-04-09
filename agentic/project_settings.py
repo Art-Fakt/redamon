@@ -67,6 +67,20 @@ DEFAULT_AGENT_SETTINGS: dict[str, Any] = {
     # LLM Parse Retry
     'LLM_PARSE_MAX_RETRIES': 3,
 
+    # Knowledge Base
+    # Precedence for KB_* keys with a kb_config.yaml equivalent: 
+    # webapp API settings (when configured; TBD) → kb_config.yaml value → kb_config.py DEFAULTS dict.
+    # "None" preserves whatever the YAML loaded at construction time.
+    'KB_ENABLED': None,            # None = inherit from kb_config.yaml (KB_ENABLED top-level)
+    'KB_SCORE_THRESHOLD': None,    # None = inherit from retrieval.score_threshold
+    'KB_TOP_K': None,              # None = inherit from retrieval.top_k
+    'KB_FALLBACK_TO_WEB': True,    # Agent-level, no yaml equivalent
+    'KB_ENABLED_SOURCES': None,    # Project-wide allowlist: None = all sources; list to restrict
+    'KB_MMR_ENABLED': None,        # None = inherit from mmr.enabled
+    'KB_MMR_LAMBDA': None,         # None = inherit from mmr.lambda
+    'KB_OVERFETCH_FACTOR': None,   # None = inherit from retrieval.overfetch_factor
+    'KB_SOURCE_BOOSTS': None,      # None = inherit from source_boosts block; dict = merge overrides
+
     # Deep Think (Strategic Reasoning)
     'DEEP_THINK_ENABLED': False,
 

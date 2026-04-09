@@ -1,6 +1,6 @@
 ---
 name: ffuf
-description: ffuf fuzzing syntax with matcher/filter strategy and non-interactive defaults.
+description: ffuf web fuzzing syntax with matcher/filter strategy and non-interactive defaults.
 ---
 
 # ffuf CLI Playbook
