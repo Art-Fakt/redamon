@@ -8,6 +8,7 @@ import type { Project } from '@prisma/client'
 import { validateProjectForm } from '@/lib/validation'
 import { isHardBlockedDomain } from '@/lib/hard-guardrail'
 import { useProject } from '@/providers/ProjectProvider'
+import useReconStatus from '@/hooks/useReconStatus'
 import { useAlertModal, useToast } from '@/components/ui'
 import type { PartialReconParams } from '@/lib/recon-types'
 import styles from './ProjectForm.module.css'
@@ -218,6 +219,12 @@ export function ProjectForm({
   const projectId =
     projectIdFromRoute ?? (initialData as { id?: string } | undefined)?.id ?? (mode === 'create' ? generatedId : undefined)
 
+  // Track recon status in edit mode to reflect running state on the Start Recon button
+  const { state: reconState } = useReconStatus({ projectId: mode === 'edit' ? (projectId ?? null) : null, enabled: mode === 'edit' })
+  const isReconRunning = reconState?.status === 'running' || reconState?.status === 'starting'
+  const isReconPaused = reconState?.status === 'paused'
+  const isReconBusy = isReconRunning || isReconPaused
+
   // Fetch defaults from backend on mount (only for create mode)
   useEffect(() => {
     if (mode === 'create') {
@@ -414,16 +421,33 @@ export function ProjectForm({
           )}
         </h1>
         <div className={styles.actions}>
-          <button
-            type="button"
-            className="secondaryButton"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            title="Discard all unsaved changes and return to the previous page"
-          >
-            <X size={14} />
-            Cancel
-          </button>
+          {mode === 'edit' && projectId ? (
+            <button
+              type="button"
+              className={`reconStartButton${isReconBusy ? ' reconStartButtonActive' : ''}`}
+              onClick={() => router.push(isReconBusy ? `/graph?project=${projectId}&openlogs=recon` : `/graph?project=${projectId}&autostart=true`)}
+              disabled={isSubmitting}
+              title={isReconRunning ? 'Recon is running -- click to view progress' : isReconPaused ? 'Recon is paused -- click to view' : 'Navigate to the graph page and start the full recon pipeline'}
+            >
+              {isReconRunning ? (
+                <Loader2 size={14} className={styles.spinner} />
+              ) : (
+                <Play size={14} />
+              )}
+              {isReconRunning ? 'Running...' : isReconPaused ? 'Paused' : 'Start Recon Pipeline'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              title="Discard all unsaved changes and return to the previous page"
+            >
+              <X size={14} />
+              Cancel
+            </button>
+          )}
           <button
             type="button"
             className="secondaryButton"

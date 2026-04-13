@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { GraphToolbar } from './components/GraphToolbar'
 import { GraphCanvas } from './components/GraphCanvas'
 import { NodeDrawer } from './components/NodeDrawer'
@@ -33,6 +33,7 @@ import styles from './page.module.css'
 
 export default function GraphPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { alertError } = useAlertModal()
   const toast = useToast()
   const { projectId, userId, currentProject, setCurrentProject, isLoading: projectLoading } = useProject()
@@ -766,6 +767,19 @@ export default function GraphPage() {
   const handleStartRecon = useCallback(() => {
     setIsReconModalOpen(true)
   }, [])
+
+  // Auto-open recon modal when navigating from project settings with autostart param
+  useEffect(() => {
+    if (searchParams.get('autostart') === 'true' && projectId) {
+      setIsReconModalOpen(true)
+      router.replace(`/graph?project=${projectId}`)
+    }
+    const openLogs = searchParams.get('openlogs')
+    if (openLogs && projectId) {
+      setActiveLogsDrawer(openLogs as 'recon' | 'gvm' | 'githubHunt' | 'trufflehog' | 'partialRecon')
+      router.replace(`/graph?project=${projectId}`)
+    }
+  }, [searchParams, projectId, router])
 
   const handleConfirmRecon = useCallback(async () => {
     clearLogs()
